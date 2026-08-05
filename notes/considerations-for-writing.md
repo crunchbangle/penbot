@@ -21,3 +21,4 @@ Then you could give it some text and it should be able to:
 This means it could adjust for any drift in angle/position at the start
 of every line.
 
+It also occured to me that lined paper would help!
