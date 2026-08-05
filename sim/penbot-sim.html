@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Penbot animator</title>
+<style>
+  :root{
+    --bg:#101317; --panel:#171b21; --panel2:#1d222a; --line:#2a313b;
+    --txt:#dfe5ec; --dim:#8b97a6; --dimmer:#5d6875;
+    --accL:#4fb8ff; --accR:#ff9c4f; --path:#4a5563; --pen:#6ee7a8;
+    --axle:#b57fe8; --warn:#ffd166; --bad:#ff6b6b; --ok:#6ee7a8;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--txt); overflow:hidden;
+    font:13px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;
+  }
+  #app{display:grid;grid-template-columns:1fr 344px;height:100vh}
+  #left{display:grid;grid-template-rows:1fr 168px;min-width:0}
+  #stage{position:relative;background:#0c0f13;min-height:0}
+  #cv{display:block;width:100%;height:100%;cursor:grab}
+  #cv.drag{cursor:grabbing}
+  #hud{
+    position:absolute;left:10px;top:10px;font:11px/1.6 var(--mono);
+    color:var(--dim);background:rgba(12,15,19,.78);border:1px solid var(--line);
+    border-radius:6px;padding:7px 10px;pointer-events:none;white-space:pre;
+  }
+  #hud b{color:var(--txt);font-weight:600}
+  #charts{
+    display:grid;grid-template-columns:1fr 1fr 168px;gap:1px;
+    background:var(--line);border-top:1px solid var(--line);min-height:0
+  }
+  .chart{position:relative;background:var(--panel);min-width:0}
+  .chart canvas{display:block;width:100%;height:100%}
+  .chart .cap{
+    position:absolute;left:8px;top:5px;font:10px var(--mono);
+    color:var(--dim);pointer-events:none;letter-spacing:.04em
+  }
+  #side{
+    background:var(--panel);border-left:1px solid var(--line);
+    overflow-y:auto;overflow-x:hidden
+  }
+  #side::-webkit-scrollbar{width:9px}
+  #side::-webkit-scrollbar-thumb{background:#2f3742;border-radius:9px}
+  h1{
+    font:600 12px/1 system-ui;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--dim);margin:0;padding:13px 14px 11px;border-bottom:1px solid var(--line)
+  }
+  section{border-bottom:1px solid var(--line);padding:10px 14px 13px}
+  section>h2{
+    font:600 10px/1 system-ui;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--dimmer);margin:0 0 9px
+  }
+  .row{display:flex;align-items:center;gap:8px;margin:5px 0}
+  .row label{flex:0 0 92px;color:var(--dim);font-size:12px}
+  .row.w label{flex:0 0 118px}
+  input[type=number],input[type=text],select,textarea{
+    flex:1;min-width:0;background:var(--panel2);color:var(--txt);
+    border:1px solid var(--line);border-radius:4px;padding:4px 6px;
+    font:12px var(--mono)
+  }
+  textarea{resize:vertical;min-height:52px;line-height:1.4}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#3d78a8}
+  input[type=range]{flex:1;min-width:0;accent-color:#4fb8ff}
+  button{
+    background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:4px;padding:5px 10px;font:12px system-ui;cursor:pointer
+  }
+  button:hover{background:#242b34;border-color:#3a4450}
+  button.pri{background:#1d4a68;border-color:#2b6d96}
+  button.pri:hover{background:#235a7e}
+  .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chk{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:12px}
+  .chk input{accent-color:#4fb8ff;margin:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+  table.tel{width:100%;border-collapse:collapse;font:11.5px var(--mono)}
+  table.tel td{padding:1.5px 0}
+  table.tel td:first-child{color:var(--dim)}
+  table.tel td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  .note{font-size:11.5px;color:var(--dim);margin:7px 0 0;line-height:1.5}
+  .note b{color:var(--txt);font-weight:600}
+  .tag{
+    display:inline-block;padding:1px 5px;border-radius:3px;font:10px var(--mono);
+    background:#2a313b;color:var(--dim)
+  }
+  .tag.w{background:#4a3c14;color:var(--warn)}
+  .tag.b{background:#4a1f1f;color:var(--bad)}
+  .tag.g{background:#1c3f2d;color:var(--ok)}
+  #diag div,#dirout div{margin:3px 0;font-size:11.5px;color:var(--dim)}
+  #diag b,#dirout b{color:var(--txt);font-weight:600;font-family:var(--mono)}
+  #tests{
+    font:11px/1.5 var(--mono);max-height:230px;overflow:auto;
+    background:#0e1216;border:1px solid var(--line);border-radius:4px;
+    padding:7px;margin-top:8px;white-space:pre-wrap
+  }
+  .pass{color:var(--ok)} .fail{color:var(--bad)} .hdr{color:var(--dim)}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:baseline}
+  #dirtab{width:100%;border-collapse:collapse;font:11px var(--mono);margin-top:6px}
+  #dirtab th{color:var(--dimmer);font-weight:400;text-align:right;padding:2px 0}
+  #dirtab th:first-child{text-align:left}
+  #dirtab td{text-align:right;padding:2px 0;font-variant-numeric:tabular-nums}
+  #dirtab td:first-child{text-align:left;color:var(--dim)}
+  #dirtab tr.win td{color:var(--ok)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="hud"></div>
+    </div>
+    <div id="charts">
+      <div class="chart"><canvas id="chWheels"></canvas>
+        <div class="cap"><span class="sw" style="background:var(--accL)"></span>v_L
+        <span class="sw" style="background:var(--accR);margin-left:8px"></span>v_R &nbsp;mm/s vs t</div></div>
+      <div class="chart"><canvas id="chErr"></canvas>
+        <div class="cap">heading error e = &theta; &minus; &phi; (deg) vs arc length</div></div>
+      <div class="chart"><canvas id="chRhomb"></canvas>
+        <div class="cap">envelope</div></div>
+    </div>
+  </div>
+
+  <div id="side">
+    <h1>Penbot animator</h1>
+
+    <section>
+      <h2>Path</h2>
+      <div class="row"><label>Source</label>
+        <select id="src">
+          <option value="circle">Circle</option>
+          <option value="line">Line</option>
+          <option value="arc">Arc</option>
+          <option value="text" selected>Text (stroke font)</option>
+          <option value="lissajous">Lissajous</option>
+          <option value="poly">Waypoints</option>
+          <option value="square">Rounded square</option>
+        </select></div>
+      <div id="pp"></div>
+      <div class="row w"><label>Entry heading err</label>
+        <input type="number" id="e0" value="0" step="5"><span style="color:var(--dim)">&deg;</span></div>
+      <div class="row w"><label>Direction</label>
+        <select id="dir"><option value="1">As authored</option>
+        <option value="-1">Reversed</option><option value="auto">Auto (cheapest)</option></select></div>
+      <div class="row w"><label>Corner thresh</label>
+        <input type="number" id="corner" value="12" step="1"><span style="color:var(--dim)">&deg;</span></div>
+    </section>
+
+    <section id="fontsec">
+      <h2>Font strategy <span class="tag">text source</span></h2>
+      <div class="row w"><label>Glyph frame</label>
+        <select id="frame">
+          <option value="world">World-exact (upright)</option>
+          <option value="body">Fixed body-frame program</option>
+        </select></div>
+      <div class="row w"><label>Run-in (&times;p)</label>
+        <input type="number" id="runin" value="0" step="0.5" min="0"></div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="optdirs">
+        optimise stroke directions for heading</label>
+      <p class="note" id="fontnote"></p>
+    </section>
+
+    <section>
+      <h2>Machine</h2>
+      <div class="grid2">
+        <div class="row"><label>d (mm)</label><input type="number" id="c_d" value="84" step="1"></div>
+        <div class="row"><label>p (mm)</label><input type="number" id="c_p" value="55" step="1"></div>
+        <div class="row"><label>wheel Ø</label><input type="number" id="c_wheelDia" value="34" step="1"></div>
+        <div class="row"><label>steps/rev</label><input type="number" id="c_stepsPerRev" value="200" step="1"></div>
+        <div class="row"><label>microsteps</label><input type="number" id="c_microsteps" value="16" step="1"></div>
+        <div class="row"><label>vMax</label><input type="number" id="c_vMax" value="30" step="1"></div>
+        <div class="row"><label>aMax</label><input type="number" id="c_aMax" value="200" step="10"></div>
+        <div class="row"><label>chord</label><input type="number" id="c_maxChord" value="0.05" step="0.01"></div>
+      </div>
+      <div class="btns"><button class="pri" id="rebuild">Rebuild</button>
+        <button id="fit">Fit view</button></div>
+    </section>
+
+    <section>
+      <h2>Playback</h2>
+      <div class="btns" style="margin:0 0 8px">
+        <button class="pri" id="play">Play</button>
+        <button id="rst">&#8676; Start</button>
+        <button id="stepb">&minus;</button><button id="stepf">+</button>
+      </div>
+      <div class="row"><label>Scrub</label><input type="range" id="scrub" min="0" max="1000" value="0"></div>
+      <div class="row"><label>Speed</label><input type="range" id="speed" min="-200" max="200" value="0">
+        <span id="speedv" style="color:var(--dim);font:11px var(--mono);width:44px;text-align:right">1.0&times;</span></div>
+      <div class="grid2" style="margin-top:7px">
+        <label class="chk"><input type="checkbox" id="t_axle" checked>axle trail</label>
+        <label class="chk"><input type="checkbox" id="t_icc">curv. centre</label>
+        <label class="chk"><input type="checkbox" id="t_target" checked>target path</label>
+        <label class="chk"><input type="checkbox" id="t_grid" checked>grid</label>
+        <label class="chk"><input type="checkbox" id="t_ghost">both directions</label>
+        <label class="chk"><input type="checkbox" id="t_tight" checked>flag r&lt;p</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Telemetry</h2>
+      <table class="tel" id="tel"></table>
+    </section>
+
+    <section>
+      <h2>Diagnostics</h2>
+      <div id="diag"></div>
+    </section>
+
+    <section>
+      <h2>Direction comparison</h2>
+      <div class="btns" style="margin:0"><button id="cmp">Compare fwd / reversed</button></div>
+      <table id="dirtab"></table>
+      <p class="note" id="dirnote"></p>
+    </section>
+
+    <section>
+      <h2>Verification &amp; export</h2>
+      <div class="btns" style="margin:0">
+        <button id="runtests">Run self-tests</button>
+        <button id="expcsv">CSV</button>
+        <button id="expjson">JSON</button>
+      </div>
+      <div id="tests" style="display:none"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   Penbot animator.  Differential-drive plotter, pen mounted p mm forward of
+   the wheel axis.  All kinematics per maths.md; heading analysis per
+   direction.md.  Units: mm, mm/s, seconds, radians internally.
+   ========================================================================== */
+
+/* ---------- config ------------------------------------------------------- */
+const CFG = {
+  d: 84, p: 55, wheelDia: 34, stepsPerRev: 200, microsteps: 16,
+  vMax: 30, aMax: 200, maxChord: 0.05
+};
+const CFG_KEYS = Object.keys(CFG);
+const lam = () => Math.PI * CFG.wheelDia / (CFG.stepsPerRev * CFG.microsteps);
+
+const MAX_CHORDS = 260000;   // guard: refuse to build absurd paths
+
+/* ---------- small maths -------------------------------------------------- */
+const TAU = Math.PI * 2;
+const DEG = 180 / Math.PI;
+const wrapPi = a => { a = (a + Math.PI) % TAU; return (a < 0 ? a + TAU : a) - Math.PI; };
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const fmt = (v, n = 3) => (Number.isFinite(v) ? v.toFixed(n) : "—");
+
+/* Inverse transform: pen velocity -> wheel linear speeds.  maths.md §3. */
+function inverse(vxp, vyp, theta, p = CFG.p, d = CFG.d) {
+  const v = vxp * Math.cos(theta) + vyp * Math.sin(theta);
+  const omega = (-vxp * Math.sin(theta) + vyp * Math.cos(theta)) / p;
+  return { v, omega, vR: v + (d / 2) * omega, vL: v - (d / 2) * omega };
+}
+/* Forward: wheel linear speeds -> pen velocity. */
+function forward(vL, vR, theta, p = CFG.p, d = CFG.d) {
+  const v = (vR + vL) / 2, omega = (vR - vL) / d;
+  return {
+    v, omega,
+    vxp: v * Math.cos(theta) - p * omega * Math.sin(theta),
+    vyp: v * Math.sin(theta) + p * omega * Math.cos(theta)
+  };
+}
+
+/* ==========================================================================
+   PATH SOURCES
+   A path is a list of subpaths: { pts:[[x,y],...], draw:bool }.
+   Pen-up connectors between subpaths are inserted by flatten().
+   ========================================================================== */
+
+function arcPts(cx, cy, rx, ry, a0deg, a1deg, seg) {
+  const a0 = a0deg / DEG, a1 = a1deg / DEG;
+  const n = seg || Math.max(12, Math.ceil(Math.abs(a1 - a0) * Math.max(rx, ry) / 0.35));
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + (a1 - a0) * i / n;
+    out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+  }
+  return out;
+}
+function bezPts(p0, p1, p2, p3, n) {
+  n = n || 80; const out = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    const b0 = u * u * u, b1 = 3 * u * u * t, b2 = 3 * u * t * t, b3 = t * t * t;
+    out.push([b0 * p0[0] + b1 * p1[0] + b2 * p2[0] + b3 * p3[0],
+              b0 * p0[1] + b1 * p1[1] + b2 * p2[1] + b3 * p3[1]]);
+  }
+  return out;
+}
+
+/* Mini path syntax used by the stroke font.
+   M x,y            move (start new stroke)
+   L x,y            line
+   C x1,y1 x2,y2 x,y  cubic bezier
+   A cx,cy,rx,ry,a0,a1  elliptical arc, angles in degrees, sign gives direction */
+function parseGlyph(src) {
+  const toks = src.trim().split(/\s+/);
+  const subs = []; let cur = null, at = null;
+  const start = pt => { cur = { pts: [pt.slice()], draw: true }; subs.push(cur); at = pt.slice(); };
+  const nums = s => s.split(",").map(Number);
+  for (let i = 0; i < toks.length; i++) {
+    const cmd = toks[i][0], rest = toks[i].slice(1);
+    if (cmd === "M") { start(nums(rest)); }
+    else if (cmd === "L") { const q = nums(rest); cur.pts.push(q); at = q; }
+    else if (cmd === "C") {
+      const a = nums(rest), b = nums(toks[++i]), c = nums(toks[++i]);
+      for (const q of bezPts(at, a, b, c)) cur.pts.push(q);
+      at = c;
+    } else if (cmd === "A") {
+      const [cx, cy, rx, ry, a0, a1] = nums(rest);
+      const seg = arcPts(cx, cy, rx, ry, a0, a1);
+      if (!cur) start(seg[0]);
+      for (let k = 1; k < seg.length; k++) cur.pts.push(seg[k]);
+      at = seg[seg.length - 1];
+    }
+  }
+  return subs;
+}
+
+/* Single-stroke geometric font.  Grid: x 0..6, y 0..10 (baseline 0, cap 10).
+   Advance width 6.  Uppercase + digits + a little punctuation. */
+const FONT = {
+  " ": "",
+  "A": "M0,0 L3,10 L6,0 M1.2,3.5 L4.8,3.5",
+  "B": "M0,0 L0,10 L3,10 A3,7.75,2.25,2.25,90,-90 L0,5.5 M0,5.5 L3.2,5.5 A3.2,2.75,2.75,2.75,90,-90 L0,0",
+  "C": "A3,5,3,5,45,315",
+  "D": "M0,0 L0,10 L2,10 A2,5,4,5,90,-90 L0,0",
+  "E": "M6,10 L0,10 L0,0 L6,0 M0,5 L4.5,5",
+  "F": "M6,10 L0,10 L0,0 M0,5 L4.5,5",
+  "G": "A3,5,3,5,45,315 L6,1.46 L6,4.8 L3.2,4.8",
+  "H": "M0,10 L0,0 M6,10 L6,0 M0,5 L6,5",
+  "I": "M1.5,10 L4.5,10 M3,10 L3,0 M1.5,0 L4.5,0",
+  "J": "M4.5,10 L4.5,2.5 A2.25,2.5,2.25,2.5,0,-180",
+  "K": "M0,10 L0,0 M6,10 L0,4 M2.2,5.8 L6,0",
+  "L": "M0,10 L0,0 L6,0",
+  "M": "M0,0 L0,10 L3,4 L6,10 L6,0",
+  "N": "M0,0 L0,10 L6,0 L6,10",
+  "O": "A3,5,3,5,0,360",
+  "P": "M0,0 L0,10 L3.2,10 A3.2,7.5,2.5,2.5,90,-90 L0,5",
+  "Q": "A3,5,3,5,0,360 M3.6,2.4 L6.2,-0.6",
+  "R": "M0,0 L0,10 L3.2,10 A3.2,7.5,2.5,2.5,90,-90 L0,5 M2.8,5 L6,0",
+  "S": "M5.4,8.9 C4.2,10.2 1.2,10.4 0.6,8.6 C0,6.8 2.4,6 3,5.6 C3.6,5.2 6,4.4 5.6,2.2 C5.2,0 2,-0.4 0.5,1.2",
+  "T": "M0,10 L6,10 M3,10 L3,0",
+  "U": "M0,10 L0,3 A3,3,3,3,180,360 L6,10",
+  "V": "M0,10 L3,0 L6,10",
+  "W": "M0,10 L1.5,0 L3,7 L4.5,0 L6,10",
+  "X": "M0,10 L6,0 M6,10 L0,0",
+  "Y": "M0,10 L3,5 L6,10 M3,5 L3,0",
+  "Z": "M0,10 L6,10 L0,0 L6,0",
+  "0": "A3,5,2.8,5,0,360",
+  "1": "M1,8.2 L3,10 L3,0 M1.2,0 L4.8,0",
+  "2": "M0.4,8.5 C0.6,10.2 5.2,10.8 5.4,7.6 C5.5,5.6 1,3.6 0.2,0.2 L5.8,0.2",
+  "3": "M0.4,9 C1.6,10.6 5.4,10.2 5.2,7.6 C5.1,6 3.4,5.4 2.4,5.4 C4,5.4 5.6,4.8 5.6,2.8 C5.6,0 1.4,-0.6 0.2,1.4",
+  "4": "M4.4,0 L4.4,10 L0,3.2 L6,3.2",
+  "5": "M5.6,10 L1,10 L0.6,5.6 C2,6.6 5.6,6.4 5.6,3.4 C5.6,0.4 2,-0.6 0.3,1.4",
+  "6": "M5.2,9.4 C3,11 0.4,9 0.4,4.6 C0.4,1 3,-0.6 4.6,1 C6.2,2.6 5.4,5.8 3,5.8 C1.6,5.8 0.6,4.8 0.5,3.6",
+  "7": "M0,10 L6,10 L2.2,0",
+  "8": "M5.4,7.6 A3,7.6,2.4,2.4,0,360 M5.8,2.6 A3,2.6,2.8,2.6,0,360",
+  "9": "M0.8,0.6 C3,-1 5.6,1 5.6,5.4 C5.6,9 3,10.6 1.4,9 C-0.2,7.4 0.6,4.2 3,4.2 C4.4,4.2 5.4,5.2 5.5,6.4",
+  ".": "M2.8,0 L3.2,0 L3.2,0.4 L2.8,0.4 L2.8,0",
+  ",": "M3.2,0.6 L2.6,-1",
+  "-": "M1,5 L5,5",
+  "!": "M3,10 L3,3 M3,0.4 L3,0",
+  "?": "M0.6,8.6 C1,10.4 5.4,10.6 5.4,7.6 C5.4,5.6 3,5.4 3,3.4 M3,0.4 L3,0"
+};
+
+/* Placed glyphs, kept as discrete units so each can be treated as one
+   replayable body-frame program.  strokes are absolute-placed polylines. */
+function textGlyphs(str, size, spacing, lineGap) {
+  const s = size / 10, out = [];
+  let ox = 0, oy = 0;
+  for (const ch0 of str) {
+    if (ch0 === "\n") { ox = 0; oy -= (10 + lineGap) * s; continue; }
+    const ch = ch0.toUpperCase(), g = FONT[ch];
+    if (g === undefined) { ox += (6 + spacing) * s; continue; }
+    if (g) {
+      const strokes = parseGlyph(g).map(sp => sp.pts.map(q => [ox + q[0] * s, oy + q[1] * s]));
+      if (strokes.length) out.push({ ch, strokes, baseY: oy });
+    }
+    ox += (6 + spacing) * s;
+  }
+  return out;
+}
+function textPath(str, size, spacing, lineGap) {
+  const subs = [];
+  for (const g of textGlyphs(str, size, spacing, lineGap))
+    for (const st of g.strokes) subs.push({ pts: st, draw: true });
+  return subs;
+}
+const rot = (q, about, a) => {
+  const c = Math.cos(a), s = Math.sin(a), dx = q[0] - about[0], dy = q[1] - about[1];
+  return [about[0] + dx * c - dy * s, about[1] + dx * s + dy * c];
+};
+
+/* ==========================================================================
+   INCREMENTAL BUILDER
+   Appends resampled chords while carrying the heading forward with the same
+   midpoint predictor plan() uses, so the two agree exactly.  Needed because
+   in body-fixed mode a glyph's orientation depends on the heading on arrival,
+   which is only known by simulating everything before it.
+   ========================================================================== */
+function newAcc(theta0, maxChord) {
+  return { X: [], Y: [], D: [], theta: theta0, dthPrev: 0, maxChord };
+}
+function accStart(A, pt) { A.X.push(pt[0]); A.Y.push(pt[1]); A.D.push(0); }
+function appendPoly(A, verts, draw) {
+  for (let k = 1; k < verts.length; k++) {
+    const from = verts[k - 1], to = verts[k];
+    const ux = to[0] - from[0], uy = to[1] - from[1], L = Math.hypot(ux, uy);
+    if (L < 1e-12) continue;
+    const n = Math.max(1, Math.ceil(L / A.maxChord));
+    for (let j = 1; j <= n; j++) {
+      const x = from[0] + ux * j / n, y = from[1] + uy * j / n;
+      const dx = x - A.X[A.X.length - 1], dy = y - A.Y[A.Y.length - 1];
+      const thMid = A.theta + 0.5 * A.dthPrev;
+      const dth = (-dx * Math.sin(thMid) + dy * Math.cos(thMid)) / CFG.p;
+      A.theta += dth; A.dthPrev = dth;
+      A.X.push(x); A.Y.push(y); A.D.push(draw);
+    }
+  }
+}
+const accMark = A => ({ n: A.X.length, theta: A.theta, dthPrev: A.dthPrev });
+function accReset(A, m) {
+  A.X.length = m.n; A.Y.length = m.n; A.D.length = m.n;
+  A.theta = m.theta; A.dthPrev = m.dthPrev;
+}
+const accPen = A => [A.X[A.X.length - 1], A.Y[A.Y.length - 1]];
+
+/* Glyph-by-glyph text run.
+   opts: { bodyFixed, runIn (mm, 0 = none), optDirs, baseAng } */
+function buildTextRun(glyphs, opts, theta0, maxChord) {
+  const A = newAcc(theta0, maxChord);
+  const base = opts.baseAng || 0;
+  const hb = [Math.cos(base), Math.sin(base)];
+  const tilts = [];
+  let started = false;
+
+  for (const gl of glyphs) {
+    /* the pen's position at program start = first point of the first stroke */
+    const S = gl.strokes[0][0];
+    const tilt = opts.bodyFixed ? wrapPi(A.theta - base) : 0;
+    tilts.push(tilt);
+    const place = st => tilt ? st.map(q => rot(q, S, tilt)) : st;
+    const strokes = gl.strokes.map(place);
+
+    if (!started) { accStart(A, strokes[0][0]); started = true; }
+    else {
+      /* transit, pen up.  A run-in leg along the baseline is the only lever on
+         the heading: it converges toward the direction of travel with length
+         scale p, so approach along the baseline to pull theta toward it. */
+      const tgt = strokes[0][0];
+      if (opts.runIn > 0) {
+        const Q = [tgt[0] - opts.runIn * hb[0], tgt[1] - opts.runIn * hb[1]];
+        appendPoly(A, [accPen(A), Q], 0);
+        appendPoly(A, [accPen(A), tgt], 0);
+      } else {
+        appendPoly(A, [accPen(A), tgt], 0);
+      }
+    }
+
+    /* stroke direction is a free choice that costs no travel.  Greedily pick
+       the direction that leaves the least net body-frame heading drift, so
+       tilt does not accumulate glyph over glyph. */
+    for (let k = 0; k < strokes.length; k++) {
+      const st = strokes[k];
+      const cands = opts.optDirs ? [st, st.slice().reverse()] : [st];
+      let best = null;
+      for (const c of cands) {
+        const m = accMark(A);
+        if (k > 0 || true) {
+          const pen = accPen(A);
+          if (Math.hypot(c[0][0] - pen[0], c[0][1] - pen[1]) > 1e-9)
+            appendPoly(A, [pen, c[0]], 0);
+        }
+        appendPoly(A, c, 1);
+        const cost = Math.abs(wrapPi(A.theta - base - tilt));
+        if (!best || cost < best.cost) best = { cost, snap: accMark(A), c };
+        accReset(A, m);
+      }
+      const pen = accPen(A);
+      if (Math.hypot(best.c[0][0] - pen[0], best.c[0][1] - pen[1]) > 1e-9)
+        appendPoly(A, [pen, best.c[0]], 0);
+      appendPoly(A, best.c, 1);
+    }
+  }
+  if (!started) { accStart(A, [0, 0]); appendPoly(A, [[0, 0], [10, 0]], 1); }
+  return {
+    X: Float64Array.from(A.X), Y: Float64Array.from(A.Y),
+    D: Uint8Array.from(A.D), n: A.X.length,
+    tilts, maxTilt: tilts.reduce((a, b) => Math.max(a, Math.abs(b)), 0)
+  };
+}
+
+/* Parameter schemas per source; rendered into the sidebar. */
+const SRC = {
+  circle: {
+    params: [["a", "radius mm", 30], ["laps", "laps", 2]],
+    build: q => [{ pts: arcPts(0, 0, q.a, q.a, 0, 360 * q.laps,
+                   Math.max(64, Math.ceil(q.a * q.laps * 4))), draw: true }]
+  },
+  line: {
+    params: [["L", "length mm", 160], ["ang", "angle deg", 0]],
+    build: q => [{ pts: [[0, 0], [q.L * Math.cos(q.ang / DEG), q.L * Math.sin(q.ang / DEG)]], draw: true }]
+  },
+  arc: {
+    params: [["a", "radius mm", 40], ["sweep", "sweep deg", 180]],
+    build: q => [{ pts: arcPts(0, 0, q.a, q.a, -90, -90 + q.sweep), draw: true }]
+  },
+  square: {
+    params: [["S", "side mm", 90], ["r", "fillet mm", 15]],
+    build: q => {
+      const S = q.S, r = clamp(q.r, 0.01, S / 2), h = S / 2, k = h - r, pts = [[-k, -h]];
+      const push = a => { for (const t of a) pts.push(t); };
+      push(arcPts(k, -k, r, r, -90, 0)); push([[h, k]]);
+      push(arcPts(k, k, r, r, 0, 90));   push([[k, h]]);
+      push(arcPts(-k, k, r, r, 90, 180));push([[-h, -k]]);
+      push(arcPts(-k, -k, r, r, 180, 270));
+      return [{ pts, draw: true }];
+    }
+  },
+  lissajous: {
+    params: [["A", "A mm", 60], ["B", "B mm", 40], ["m", "m", 3], ["n", "n", 2], ["ph", "phase deg", 90]],
+    build: q => {
+      const N = 1200, pts = [];
+      for (let i = 0; i <= N; i++) {
+        const t = TAU * i / N;
+        pts.push([q.A * Math.sin(q.m * t + q.ph / DEG), q.B * Math.sin(q.n * t)]);
+      }
+      return [{ pts, draw: true }];
+    }
+  },
+  text: {
+    params: [["size", "cap height mm", 5], ["spacing", "letter gap", 1.6], ["lineGap", "line gap", 4]],
+    text: ["str", "text", "PENBOT"],
+    build: q => textPath(q.str || "PEN", q.size, q.spacing, q.lineGap)
+  },
+  poly: {
+    params: [],
+    text: ["str", "x,y per line", "0,0\n80,0\n80,60\n0,60\n0,0"],
+    build: q => {
+      const pts = (q.str || "").trim().split(/\n+/).map(l => l.split(/[,\s]+/).map(Number))
+        .filter(v => v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1]))
+        .map(v => [v[0], v[1]]);
+      return pts.length >= 2 ? [{ pts, draw: true }] : [{ pts: [[0, 0], [50, 0]], draw: true }];
+    }
+  }
+};
+
+/* ==========================================================================
+   FLATTEN — subpaths (+ pen-up connectors) into a chord list.
+   Resamples each source segment independently so authored vertices survive,
+   which is what corner detection needs.
+   ========================================================================== */
+function flatten(subs, maxChord, reverse) {
+  let list = subs.filter(s => s.pts.length >= 2);
+  if (reverse) list = list.slice().reverse().map(s => ({ pts: s.pts.slice().reverse(), draw: s.draw }));
+  if (!list.length) list = [{ pts: [[0, 0], [10, 0]], draw: true }];
+
+  const X = [], Y = [], D = [];
+  const emitSeg = (from, to, draw) => {
+    const dx = to[0] - from[0], dy = to[1] - from[1];
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-12) return;
+    const n = Math.max(1, Math.ceil(L / maxChord));
+    for (let j = 1; j <= n; j++) {
+      X.push(from[0] + dx * j / n); Y.push(from[1] + dy * j / n); D.push(draw);
+    }
+  };
+  X.push(list[0].pts[0][0]); Y.push(list[0].pts[0][1]); D.push(0);
+  let at = list[0].pts[0];
+  for (const s of list) {
+    if (at[0] !== s.pts[0][0] || at[1] !== s.pts[0][1]) emitSeg(at, s.pts[0], 0);  // pen up
+    for (let i = 1; i < s.pts.length; i++) emitSeg(s.pts[i - 1], s.pts[i], s.draw ? 1 : 0);
+    at = s.pts[s.pts.length - 1];
+  }
+  return {
+    X: Float64Array.from(X), Y: Float64Array.from(Y), D: Uint8Array.from(D),
+    n: X.length
+  };
+}
+
+/* ==========================================================================
+   PIPELINE — plan (float) -> quantise (residual-carrying) -> execute
+              (forward kinematics from integer steps) -> timing
+   ========================================================================== */
+function build(path, theta0, cornerDeg) {
+  const n = path.n, { X, Y, D } = path;
+  const L = lam(), d = CFG.d, p = CFG.p;
+
+  /* --- 1. plan: midpoint predictor, float step targets ------------------- */
+  const dsL = new Float64Array(n), dsR = new Float64Array(n);
+  const dsp = new Float64Array(n), thP = new Float64Array(n);
+  const tLf = new Float64Array(n), tRf = new Float64Array(n);
+  const phi = new Float64Array(n), kap = new Float64Array(n);
+  let theta = theta0, dthPrev = 0;
+  thP[0] = theta0;
+  for (let i = 1; i < n; i++) {
+    const dx = X[i] - X[i - 1], dy = Y[i] - Y[i - 1];
+    const thMid = theta + 0.5 * dthPrev;
+    const ds  =  dx * Math.cos(thMid) + dy * Math.sin(thMid);
+    const dth = (-dx * Math.sin(thMid) + dy * Math.cos(thMid)) / p;
+    dsR[i] = ds + d * dth / 2;
+    dsL[i] = ds - d * dth / 2;
+    dsp[i] = Math.hypot(dx, dy);
+    phi[i] = Math.atan2(dy, dx);
+    tRf[i] = tRf[i - 1] + dsR[i] / L;
+    tLf[i] = tLf[i - 1] + dsL[i] / L;
+    theta += dth; dthPrev = dth;
+    thP[i] = theta;
+  }
+  phi[0] = phi[1] || 0;
+  for (let i = 1; i < n; i++) {
+    const dphi = wrapPi(phi[i] - phi[i === 1 ? 1 : i - 1]);
+    kap[i] = dsp[i] > 1e-12 ? dphi / dsp[i] : 0;
+  }
+
+  /* --- 2. quantise: round the running float target, never the increment.
+           The fractional remainder is therefore carried automatically. ----- */
+  const NL = new Float64Array(n), NR = new Float64Array(n);
+  for (let i = 1; i < n; i++) { NL[i] = Math.round(tLf[i]); NR[i] = Math.round(tRf[i]); }
+
+  /* --- 3. execute: exact arc update from integer step counts ------------- */
+  const cx = new Float64Array(n), cy = new Float64Array(n), th = new Float64Array(n);
+  const px = new Float64Array(n), py = new Float64Array(n);
+  th[0] = theta0;
+  cx[0] = X[0] - p * Math.cos(theta0);
+  cy[0] = Y[0] - p * Math.sin(theta0);
+  px[0] = X[0]; py[0] = Y[0];
+  for (let i = 1; i < n; i++) {
+    const eL = (NL[i] - NL[i - 1]) * L, eR = (NR[i] - NR[i - 1]) * L;
+    const ds = (eR + eL) / 2, dth = (eR - eL) / d;
+    const t0 = th[i - 1];
+    if (Math.abs(dth) < 1e-9) {
+      cx[i] = cx[i - 1] + ds * Math.cos(t0);
+      cy[i] = cy[i - 1] + ds * Math.sin(t0);
+    } else {
+      const R = ds / dth;
+      cx[i] = cx[i - 1] + R * (Math.sin(t0 + dth) - Math.sin(t0));
+      cy[i] = cy[i - 1] + R * (Math.cos(t0) - Math.cos(t0 + dth));
+    }
+    /* heading from step counts directly — no integration drift (maths.md §3) */
+    th[i] = theta0 + L * (NR[i] - NL[i]) / d;
+    px[i] = cx[i] + p * Math.cos(th[i]);
+    py[i] = cy[i] + p * Math.sin(th[i]);
+  }
+
+  /* --- 4. timing: feedrate planning on the pen, wheel-referred limits ---- */
+  const rL = new Float64Array(n), rR = new Float64Array(n), f = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    const s = dsp[i] > 1e-12 ? 1 / dsp[i] : 0;
+    rL[i] = dsL[i] * s; rR[i] = dsR[i] * s;
+  }
+  rL[0] = rL[1] || 1; rR[0] = rR[1] || 1;
+
+  /* stop points: authored corners, and every pen up/down transition */
+  const cosThresh = Math.cos(cornerDeg / DEG);
+  const stop = new Uint8Array(n);
+  stop[0] = 1; stop[n - 1] = 1;
+  let corners = 0;
+  for (let i = 1; i < n - 1; i++) {
+    if (D[i] !== D[i + 1]) { stop[i] = 1; continue; }
+    const ax = X[i] - X[i - 1], ay = Y[i] - Y[i - 1];
+    const bx = X[i + 1] - X[i], by = Y[i + 1] - Y[i];
+    const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+    if (la < 1e-12 || lb < 1e-12) continue;
+    if ((ax * bx + ay * by) / (la * lb) < cosThresh) { stop[i] = 1; corners++; }
+  }
+
+  const accCap = i => CFG.aMax / Math.max(Math.abs(rL[i]), Math.abs(rR[i]), 1e-6);
+  for (let i = 0; i < n; i++) {
+    const m = Math.max(Math.abs(rL[i]), Math.abs(rR[i]), 1e-6);
+    let fi = CFG.vMax / m;
+    /* limit from how fast the wheel ratios themselves change: at constant pen
+       feedrate f, dv_wheel/dt = f^2 * dr/ds, which must stay under aMax. */
+    if (i > 1 && i < n - 1 && dsp[i] > 1e-12) {
+      const drL = Math.abs(rL[i + 1] - rL[i - 1]) / (dsp[i] + dsp[i + 1] || dsp[i]);
+      const drR = Math.abs(rR[i + 1] - rR[i - 1]) / (dsp[i] + dsp[i + 1] || dsp[i]);
+      const dr = Math.max(drL, drR);
+      if (dr > 1e-9) fi = Math.min(fi, Math.sqrt(CFG.aMax / dr));
+    }
+    f[i] = stop[i] ? 0 : fi;
+  }
+  for (let i = 1; i < n; i++)               // forward accel pass
+    f[i] = Math.min(f[i], Math.sqrt(f[i - 1] * f[i - 1] + 2 * accCap(i) * dsp[i]));
+  for (let i = n - 2; i >= 0; i--)          // backward decel pass
+    f[i] = Math.min(f[i], Math.sqrt(f[i + 1] * f[i + 1] + 2 * accCap(i + 1) * dsp[i + 1]));
+
+  const t = new Float64Array(n);
+  const vL = new Float64Array(n), vR = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    const fm = Math.max((f[i - 1] + f[i]) / 2, 1e-6);
+    const dt = dsp[i] / fm;
+    t[i] = t[i - 1] + dt;
+    vL[i] = dsL[i] / dt; vR[i] = dsR[i] / dt;
+  }
+  vL[0] = 0; vR[0] = 0;
+
+  /* --- 5. derived per-sample diagnostics -------------------------------- */
+  const err = new Float64Array(n), ct = new Float64Array(n), s = new Float64Array(n);
+  for (let i = 1; i < n; i++) s[i] = s[i - 1] + dsp[i];
+  for (let i = 0; i < n; i++) {
+    err[i] = wrapPi(thP[i] - phi[Math.max(i, 1)]);
+    const ph = phi[Math.max(i, 1)];
+    ct[i] = -(px[i] - X[i]) * Math.sin(ph) + (py[i] - Y[i]) * Math.cos(ph);
+  }
+
+  /* --- 6. aggregates ---------------------------------------------------- */
+  let wheelTravel = 0, peakE = 0, maxCT = 0, tight = 0, tightLen = 0, drawLen = 0;
+  let sweep = 0, penUpLen = 0;
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (let i = 1; i < n; i++) {
+    sweep += Math.abs(thP[i] - thP[i - 1]);
+    if (!D[i]) penUpLen += dsp[i];
+    wheelTravel += Math.abs(dsL[i]) + Math.abs(dsR[i]);
+    peakE = Math.max(peakE, Math.abs(err[i]));
+    maxCT = Math.max(maxCT, Math.abs(ct[i]));
+    if (Math.abs(kap[i]) > 1 / p) { tight++; tightLen += dsp[i]; }
+    if (D[i]) drawLen += dsp[i];
+    bx0 = Math.min(bx0, cx[i]); by0 = Math.min(by0, cy[i]);
+    bx1 = Math.max(bx1, cx[i]); by1 = Math.max(by1, cy[i]);
+  }
+  /* settling length: last arc length at which |e| exceeded 5 deg */
+  let settle = 0;
+  for (let i = n - 1; i > 0; i--) if (Math.abs(err[i]) > 5 / DEG) { settle = s[i]; break; }
+
+  return {
+    n, X, Y, D, s, dsp, dsL, dsR, rL, rR, NL, NR, cx, cy, th, px, py,
+    vL, vR, t, err, ct, kap, phi, thP, stop, theta0,
+    tTotal: t[n - 1],
+    stats: {
+      wheelTravel, peakE, maxCT, corners, tight, tightLen, drawLen, sweep, penUpLen,
+      pathLen: s[n - 1], settle,
+      bodyBox: [bx0, by0, bx1, by1],
+      closure: Math.hypot(px[n - 1] - X[n - 1], py[n - 1] - Y[n - 1]),
+      netTheta: wrapPi(th[n - 1] - th[0])
+    }
+  };
+}
+
+/* Replay the SAME integer step program on a machine whose real track width is
+   dP, not the d it was planned for.  This is the dominant real-hardware error
+   mode: heading comes from lambda*(nR-nL)/d, so a calibration error in d scales
+   every accumulated heading change, and the pen sits p mm out on the end of
+   that lever.  Error therefore grows with total heading sweep, not path length
+   — which is exactly why crab/oscillation regimes hurt and forward-dominant
+   ones do not.  Returns max and final pen deviation from the intended path. */
+function reexecute(r, dP) {
+  const L = lam(), p = CFG.p;
+  let cx = r.cx[0], cy = r.cy[0], th = r.theta0, mx = 0;
+  for (let i = 1; i < r.n; i++) {
+    const eL = (r.NL[i] - r.NL[i - 1]) * L, eR = (r.NR[i] - r.NR[i - 1]) * L;
+    const ds = (eR + eL) / 2, dth = (eR - eL) / dP, t0 = th;
+    if (Math.abs(dth) < 1e-9) { cx += ds * Math.cos(t0); cy += ds * Math.sin(t0); }
+    else {
+      const R = ds / dth;
+      cx += R * (Math.sin(t0 + dth) - Math.sin(t0));
+      cy += R * (Math.cos(t0) - Math.cos(t0 + dth));
+    }
+    th = r.theta0 + L * (r.NR[i] - r.NL[i]) / dP;
+    const e = Math.hypot(cx + p * Math.cos(th) - r.X[i], cy + p * Math.sin(th) - r.Y[i]);
+    if (e > mx) mx = e;
+  }
+  return mx;
+}
+
+/* ==========================================================================
+   STATE + BUILD ORCHESTRATION
+   ========================================================================== */
+const S = {
+  run: null, ghost: null, subs: null,
+  tNow: 0, playing: false, speed: 1,
+  view: { cx: 0, cy: 0, scale: 3, set: false },
+  reversed: false, warn: []
+};
+const $ = id => document.getElementById(id);
+const P = {};   // path params
+
+function readCfg() {
+  for (const k of CFG_KEYS) {
+    const el = $("c_" + k); if (!el) continue;
+    const v = parseFloat(el.value);
+    if (Number.isFinite(v) && v > 0) CFG[k] = v;
+  }
+}
+
+function renderParams() {
+  const src = $("src").value, def = SRC[src], box = $("pp");
+  box.innerHTML = "";
+  for (const [key, label, dflt] of def.params) {
+    if (P[src + "." + key] === undefined) P[src + "." + key] = dflt;
+    const row = document.createElement("div"); row.className = "row w";
+    row.innerHTML = `<label>${label}</label><input type="number" step="any">`;
+    const inp = row.querySelector("input");
+    inp.value = P[src + "." + key];
+    inp.oninput = () => { P[src + "." + key] = parseFloat(inp.value); rebuild(); };
+    box.appendChild(row);
+  }
+  if (def.text) {
+    const [key, label, dflt] = def.text;
+    if (P[src + "." + key] === undefined) P[src + "." + key] = dflt;
+    const row = document.createElement("div"); row.className = "row w";
+    row.style.alignItems = "flex-start";
+    row.innerHTML = `<label>${label}</label><textarea spellcheck="false"></textarea>`;
+    const ta = row.querySelector("textarea");
+    ta.value = P[src + "." + key];
+    ta.oninput = () => { P[src + "." + key] = ta.value; rebuild(); };
+    box.appendChild(row);
+  }
+}
+
+function srcArgs() {
+  const src = $("src").value, def = SRC[src], q = {};
+  for (const [k] of def.params) q[k] = P[src + "." + k];
+  if (def.text) q[def.text[0]] = P[src + "." + def.text[0]];
+  return q;
+}
+function currentSubs() { return SRC[$("src").value].build(srcArgs()); }
+
+/* One place that turns the UI state into a built run, shared by rebuild()
+   and compare().  Text gets the glyph-sequential builder; everything else
+   goes through flatten(). */
+function makeRun(rev) {
+  const cornerDeg = parseFloat($("corner").value) || 12;
+  const e0 = (parseFloat($("e0").value) || 0) / DEG;
+  let path;
+  if ($("src").value === "text") {
+    const q = srcArgs();
+    let glyphs = textGlyphs(q.str || "PEN", q.size, q.spacing, q.lineGap);
+    if (rev) glyphs = glyphs.slice().reverse();
+    path = buildTextRun(glyphs, {
+      bodyFixed: $("frame").value === "body",
+      runIn: Math.max(0, (parseFloat($("runin").value) || 0) * CFG.p),
+      optDirs: $("optdirs").checked,
+      baseAng: 0
+    }, e0, CFG.maxChord);
+  } else {
+    path = flatten(currentSubs(), CFG.maxChord, rev);
+  }
+  if (path.n > MAX_CHORDS) {
+    S.warn.push(["b", `Path needs ${path.n.toLocaleString()} chords (cap ${MAX_CHORDS.toLocaleString()}). Raise the chord length or shorten the text/path.`]);
+    return null;
+  }
+  const tan0 = Math.atan2(path.Y[1] - path.Y[0], path.X[1] - path.X[0]);
+  const theta0 = $("src").value === "text" ? e0 : tan0 + e0;
+  const r = build(path, theta0, cornerDeg);
+  r.meta = { tilts: path.tilts, maxTilt: path.maxTilt };
+  return r;
+}
+
+function rebuild() {
+  readCfg();
+  S.warn = [];
+  if (CFG.p <= CFG.d / 2)
+    S.warn.push(["b", `p = ${CFG.p} <= d/2 = ${CFG.d / 2}: pen is between the wheels; lateral motion now costs more than forward.`]);
+
+  $("fontsec").style.opacity = $("src").value === "text" ? "1" : ".42";
+  const dirSel = $("dir").value;
+  const mk = rev => makeRun(rev);
+
+  let fwd = mk(false);
+  if (!fwd) { S.run = null; draw(); paintDiag(); return; }
+
+  if (dirSel === "auto") {
+    const rev = mk(true);
+    if (rev && rev.tTotal < fwd.tTotal) { S.run = rev; S.reversed = true; }
+    else { S.run = fwd; S.reversed = false; }
+    S.ghost = null;
+  } else if (dirSel === "-1") {
+    S.run = mk(true) || fwd; S.reversed = true;
+  } else {
+    S.run = fwd; S.reversed = false;
+  }
+  if ($("t_ghost").checked) S.ghost = mk(!S.reversed);
+  else S.ghost = null;
+
+  S.tNow = clamp(S.tNow, 0, S.run.tTotal);
+  if (!S.view.set) fitView();
+  draw(); paintDiag(); paintCharts();
+}
+
+/* ==========================================================================
+   VIEW / RENDER
+   ========================================================================== */
+const cv = $("cv"), g = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const r = cv.parentElement.getBoundingClientRect();
+  W = Math.max(1, Math.round(r.width)); H = Math.max(1, Math.round(r.height));
+  cv.width = W * DPR; cv.height = H * DPR;
+  for (const c of [$("chWheels"), $("chErr"), $("chRhomb")]) {
+    const q = c.parentElement.getBoundingClientRect();
+    c.width = Math.max(1, Math.round(q.width * DPR));
+    c.height = Math.max(1, Math.round(q.height * DPR));
+  }
+  draw(); paintCharts();
+}
+const sx = x => (x - S.view.cx) * S.view.scale + W / 2;
+const sy = y => H / 2 - (y - S.view.cy) * S.view.scale;
+const wx = X => (X - W / 2) / S.view.scale + S.view.cx;
+const wy = Y => (H / 2 - Y) / S.view.scale + S.view.cy;
+
+function fitView() {
+  const r = S.run; if (!r) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < r.n; i += Math.max(1, r.n >> 12)) {
+    x0 = Math.min(x0, r.X[i], r.cx[i]); x1 = Math.max(x1, r.X[i], r.cx[i]);
+    y0 = Math.min(y0, r.Y[i], r.cy[i]); y1 = Math.max(y1, r.Y[i], r.cy[i]);
+  }
+  const m = CFG.d;
+  x0 -= m; y0 -= m; x1 += m; y1 += m;
+  S.view.cx = (x0 + x1) / 2; S.view.cy = (y0 + y1) / 2;
+  S.view.scale = Math.min(W / Math.max(x1 - x0, 1), H / Math.max(y1 - y0, 1));
+  S.view.set = true;
+}
+
+function idxAtTime(r, tt) {
+  let lo = 0, hi = r.n - 1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (r.t[m] < tt) lo = m + 1; else hi = m; }
+  return lo;
+}
+
+function polyline(r, xa, ya, i0, i1, step) {
+  g.beginPath();
+  g.moveTo(sx(xa[i0]), sy(ya[i0]));
+  for (let i = i0 + step; i <= i1; i += step) g.lineTo(sx(xa[i]), sy(ya[i]));
+  if (i1 > i0) g.lineTo(sx(xa[i1]), sy(ya[i1]));
+  g.stroke();
+}
+
+function drawGrid() {
+  const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500];
+  let gs = steps.find(v => v * S.view.scale > 46) || 1000;
+  g.lineWidth = 1;
+  for (let pass = 0; pass < 2; pass++) {
+    const st = pass ? gs * 5 : gs;
+    g.strokeStyle = pass ? "#1c222a" : "#151a20";
+    g.beginPath();
+    const X0 = Math.floor(wx(0) / st) * st, X1 = wx(W);
+    for (let x = X0; x <= X1; x += st) { const p = Math.round(sx(x)) + .5; g.moveTo(p, 0); g.lineTo(p, H); }
+    const Y0 = Math.floor(wy(H) / st) * st, Y1 = wy(0);
+    for (let y = Y0; y <= Y1; y += st) { const p = Math.round(sy(y)) + .5; g.moveTo(0, p); g.lineTo(W, p); }
+    g.stroke();
+  }
+  g.strokeStyle = "#232b34"; g.beginPath();
+  g.moveTo(0, Math.round(sy(0)) + .5); g.lineTo(W, Math.round(sy(0)) + .5);
+  g.moveTo(Math.round(sx(0)) + .5, 0); g.lineTo(Math.round(sx(0)) + .5, H);
+  g.stroke();
+  g.fillStyle = "#404a56"; g.font = "10px " + getComputedStyle(document.body).fontFamily;
+  g.fillText(gs + " mm", 8, H - 8);
+  g.strokeStyle = "#404a56"; g.beginPath();
+  g.moveTo(56, H - 12); g.lineTo(56 + gs * S.view.scale, H - 12);
+  g.moveTo(56, H - 16); g.lineTo(56, H - 8);
+  g.moveTo(56 + gs * S.view.scale, H - 16); g.lineTo(56 + gs * S.view.scale, H - 8);
+  g.stroke();
+}
+
+function drawBody(r, i, alpha) {
+  const th = r.th[i], c = Math.cos(th), s = Math.sin(th);
+  const X = r.cx[i], Y = r.cy[i], d = CFG.d, p = CFG.p;
+  const L = (ax, ay) => [sx(X + ax * c - ay * s), sy(Y + ax * s + ay * c)];
+  g.globalAlpha = alpha;
+
+  /* chassis outline: from 22 mm behind the axle to just past the pen */
+  const hull = [[-22, -d / 2 - 5], [p + 9, -d / 2 - 5], [p + 9, d / 2 + 5], [-22, d / 2 + 5]];
+  g.beginPath();
+  hull.forEach((q, k) => { const t = L(q[0], q[1]); k ? g.lineTo(t[0], t[1]) : g.moveTo(t[0], t[1]); });
+  g.closePath();
+  g.fillStyle = "rgba(40,49,60,.62)"; g.fill();
+  g.strokeStyle = "#5b6774"; g.lineWidth = 1.4; g.stroke();
+
+  /* wheels */
+  const wr = CFG.wheelDia / 2;
+  for (const sgn of [-1, 1]) {
+    const w = [[-wr, sgn * d / 2 - 3.4], [wr, sgn * d / 2 - 3.4], [wr, sgn * d / 2 + 3.4], [-wr, sgn * d / 2 + 3.4]];
+    g.beginPath();
+    w.forEach((q, k) => { const t = L(q[0], q[1]); k ? g.lineTo(t[0], t[1]) : g.moveTo(t[0], t[1]); });
+    g.closePath();
+    g.fillStyle = sgn > 0 ? "rgba(79,184,255,.30)" : "rgba(255,156,79,.30)";
+    g.fill();
+    g.strokeStyle = sgn > 0 ? "var(--accL)" : "var(--accR)";
+    g.strokeStyle = sgn > 0 ? "#4fb8ff" : "#ff9c4f";
+    g.lineWidth = 1.2; g.stroke();
+  }
+  /* axle line + centre */
+  g.strokeStyle = "#7c8896"; g.lineWidth = 1; g.setLineDash([3, 3]);
+  g.beginPath();
+  let a = L(0, -d / 2), b = L(0, d / 2);
+  g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.setLineDash([]);
+  /* pen boom + pen */
+  g.strokeStyle = "#8b97a6"; g.lineWidth = 1.6;
+  a = L(0, 0); b = L(p, 0);
+  g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+  g.fillStyle = "#8b97a6"; g.beginPath(); g.arc(a[0], a[1], 2.6, 0, TAU); g.fill();
+  const down = r.D[Math.max(i, 1)];
+  g.fillStyle = down ? "#6ee7a8" : "#3c4650";
+  g.beginPath(); g.arc(b[0], b[1], 4, 0, TAU); g.fill();
+  g.strokeStyle = "#0c0f13"; g.lineWidth = 1.2; g.stroke();
+  /* heading arrow */
+  const h0 = L(p + 12, 0), h1 = L(p + 26, 0), h2 = L(p + 20, 4), h3 = L(p + 20, -4);
+  g.strokeStyle = "#6b7683"; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(h0[0], h0[1]); g.lineTo(h1[0], h1[1]);
+  g.moveTo(h2[0], h2[1]); g.lineTo(h1[0], h1[1]); g.lineTo(h3[0], h3[1]); g.stroke();
+  g.globalAlpha = 1;
+}
+
+function draw() {
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "#0c0f13"; g.fillRect(0, 0, W, H);
+  if ($("t_grid").checked) drawGrid();
+  const r = S.run;
+  if (!r) { paintHud(null, 0); return; }
+  const i = idxAtTime(r, S.tNow);
+  const step = Math.max(1, Math.ceil(r.n / 9000));
+
+  /* target path */
+  if ($("t_target").checked) {
+    g.lineWidth = 1; g.strokeStyle = "#3b4552";
+    polyline(r, r.X, r.Y, 0, r.n - 1, step);
+    if ($("t_tight").checked) {          // arcs tighter than p — no steady state
+      g.strokeStyle = "rgba(255,209,102,.5)"; g.lineWidth = 2.5;
+      g.beginPath();
+      let open = false;
+      for (let k = 1; k < r.n; k += step) {
+        if (Math.abs(r.kap[k]) > 1 / CFG.p && r.D[k]) {
+          if (!open) { g.moveTo(sx(r.X[k]), sy(r.Y[k])); open = true; }
+          else g.lineTo(sx(r.X[k]), sy(r.Y[k]));
+        } else open = false;
+      }
+      g.stroke();
+    }
+  }
+
+  /* ghost = the other direction */
+  if (S.ghost) {
+    g.lineWidth = 1; g.strokeStyle = "rgba(181,127,232,.28)";
+    polyline(S.ghost, S.ghost.cx, S.ghost.cy, 0, S.ghost.n - 1, Math.max(1, Math.ceil(S.ghost.n / 6000)));
+  }
+
+  /* axle-centre trail */
+  if ($("t_axle").checked) {
+    g.lineWidth = 1.1; g.strokeStyle = "#8a5fc0"; g.setLineDash([5, 4]);
+    polyline(r, r.cx, r.cy, 0, i, step); g.setLineDash([]);
+  }
+
+  /* drawn pen trail: only where the pen is down */
+  g.lineWidth = 1.9; g.strokeStyle = "#6ee7a8"; g.lineJoin = "round";
+  g.beginPath(); let pen = false;
+  for (let k = 1; k <= i; k += step) {
+    if (r.D[k]) {
+      if (!pen) { g.moveTo(sx(r.px[k - 1] ?? r.px[k]), sy(r.py[k - 1] ?? r.py[k])); pen = true; }
+      g.lineTo(sx(r.px[k]), sy(r.py[k]));
+    } else pen = false;
+  }
+  g.stroke();
+  /* pen-up travel */
+  g.lineWidth = 1; g.strokeStyle = "rgba(110,231,168,.20)"; g.setLineDash([2, 4]);
+  g.beginPath(); pen = false;
+  for (let k = 1; k <= i; k += step) {
+    if (!r.D[k]) {
+      if (!pen) { g.moveTo(sx(r.px[k - 1] ?? r.px[k]), sy(r.py[k - 1] ?? r.py[k])); pen = true; }
+      g.lineTo(sx(r.px[k]), sy(r.py[k]));
+    } else pen = false;
+  }
+  g.stroke(); g.setLineDash([]);
+
+  /* instantaneous centre of curvature of the axle centre */
+  if ($("t_icc").checked) {
+    const om = (r.vR[i] - r.vL[i]) / CFG.d, v = (r.vR[i] + r.vL[i]) / 2;
+    if (Math.abs(om) > 1e-6) {
+      const R = v / om;
+      const ix = r.cx[i] - R * Math.sin(r.th[i]), iy = r.cy[i] + R * Math.cos(r.th[i]);
+      if (Math.abs(R) * S.view.scale < 8000) {
+        g.strokeStyle = "rgba(255,209,102,.5)"; g.lineWidth = 1; g.setLineDash([2, 3]);
+        g.beginPath(); g.moveTo(sx(r.cx[i]), sy(r.cy[i])); g.lineTo(sx(ix), sy(iy)); g.stroke();
+        g.beginPath(); g.arc(sx(ix), sy(iy), Math.abs(R) * S.view.scale, 0, TAU); g.stroke();
+        g.setLineDash([]);
+        g.fillStyle = "#ffd166"; g.beginPath(); g.arc(sx(ix), sy(iy), 3, 0, TAU); g.fill();
+      }
+    }
+  }
+
+  drawBody(r, i, 1);
+  paintHud(r, i);
+  paintTel(r, i);
+}
+
+/* ---------- HUD + telemetry --------------------------------------------- */
+function paintHud(r, i) {
+  if (!r) { $("hud").textContent = "no path"; return; }
+  const pct = r.tTotal > 0 ? 100 * S.tNow / r.tTotal : 0;
+  $("hud").innerHTML =
+    `t <b>${S.tNow.toFixed(2)}</b> / ${r.tTotal.toFixed(2)} s   (${pct.toFixed(1)}%)\n` +
+    `s <b>${r.s[i].toFixed(2)}</b> / ${r.s[r.n - 1].toFixed(2)} mm    chord ${i}/${r.n - 1}\n` +
+    `pen <b>${r.D[Math.max(i, 1)] ? "DOWN" : "up"}</b>` +
+    (S.reversed ? "   <b>reversed</b>" : "");
+}
+function paintTel(r, i) {
+  const om = (r.vR[i] - r.vL[i]) / CFG.d, v = (r.vR[i] + r.vL[i]) / 2;
+  const rows = [
+    ["theta", fmt(r.th[i] * DEG, 2) + "&deg;"],
+    ["e = theta-phi", fmt(r.err[i] * DEG, 2) + "&deg;"],
+    ["v (axle)", fmt(v, 2) + " mm/s"],
+    ["omega", fmt(om * DEG, 2) + " &deg;/s"],
+    ["v_L", fmt(r.vL[i], 3)],
+    ["v_R", fmt(r.vR[i], 3)],
+    ["pen speed", fmt(Math.hypot(v * Math.cos(r.th[i]) - CFG.p * om * Math.sin(r.th[i]),
+                                 v * Math.sin(r.th[i]) + CFG.p * om * Math.cos(r.th[i])), 2)],
+    ["n_L", r.NL[i].toFixed(0)],
+    ["n_R", r.NR[i].toFixed(0)],
+    ["cross-track", (r.ct[i] * 1000).toFixed(1) + " &micro;m"],
+    ["1/kappa", Math.abs(r.kap[i]) > 1e-9 ? fmt(1 / r.kap[i], 1) + " mm" : "&infin;"]
+  ];
+  $("tel").innerHTML = rows.map(q => `<tr><td>${q[0]}</td><td>${q[1]}</td></tr>`).join("");
+}
+
+/* ---------- diagnostics panel ------------------------------------------- */
+function paintDiag() {
+  const L = lam(), d = CFG.d, p = CFG.p;
+  const latRes = p * L / d * 1000;
+  const spinSteps = Math.PI * d / L;
+  const out = [];
+  const push = (k, v, tag) => out.push(`<div>${k} <b>${v}</b>${tag ? " " + tag : ""}</div>`);
+  push("lambda", fmt(L, 6) + " mm/step");
+  push("lateral pen res", latRes.toFixed(1) + " &micro;m",
+    latRes > 50 ? '<span class="tag w">coarse</span>' : '<span class="tag g">ok</span>');
+  push("steps / full spin", spinSteps.toFixed(0));
+  push("envelope", `fwd ${CFG.vMax.toFixed(1)} · side ${(2 * p / d * CFG.vMax).toFixed(1)} · diag ${(CFG.vMax / (1 + d / (2 * p)) * Math.SQRT2).toFixed(1)} mm/s`);
+  push("min steady arc", p.toFixed(1) + " mm (= p)");
+  push("one wheel stops at", (Math.atan(2 * p / d) * DEG).toFixed(2) + "&deg; off heading");
+
+  const r = S.run;
+  if (r) {
+    const st = r.stats;
+    out.push('<div style="height:6px"></div>');
+    push("path length", st.pathLen.toFixed(1) + " mm (" + st.drawLen.toFixed(1) + " drawn)");
+    push("chords", r.n.toLocaleString() + " @ &le;" + CFG.maxChord + " mm");
+    push("run time", st.pathLen ? r.tTotal.toFixed(2) + " s" : "—");
+    push("wheel travel", st.wheelTravel.toFixed(0) + " mm");
+    push("peak |e|", (st.peakE * DEG).toFixed(1) + "&deg;");
+    push("heading sweep &Sigma;|d&theta;|", (st.sweep * DEG).toFixed(0) + "&deg; (" + (st.sweep / TAU).toFixed(2) + " turns)");
+    /* the number that actually predicts real-world quality */
+    const s1 = reexecute(r, d * 1.01), s5 = reexecute(r, d + 0.5);
+    push("pen err if d is +1%", s1.toFixed(2) + " mm",
+      s1 > 1 ? '<span class="tag b">calibrate d</span>' : s1 > 0.3 ? '<span class="tag w">marginal</span>' : '<span class="tag g">tolerant</span>');
+    push("pen err if d is +0.5 mm", s5.toFixed(2) + " mm");
+    push("pen-up travel", st.penUpLen.toFixed(0) + " mm (" + (100 * st.penUpLen / st.pathLen).toFixed(0) + "% of run)");
+    if (r.meta && r.meta.maxTilt !== undefined)
+      push("max glyph tilt", (r.meta.maxTilt * DEG).toFixed(1) + "&deg;",
+        r.meta.maxTilt * DEG > 5 ? '<span class="tag w">visible</span>' : '<span class="tag g">ok</span>');
+    push("settled by s =", st.settle > 0 ? st.settle.toFixed(1) + " mm" : "immediately");
+    push("max cross-track", (st.maxCT * 1000).toFixed(1) + " &micro;m",
+      st.maxCT * 1000 > 3 * latRes ? '<span class="tag w">check quantiser</span>' : '<span class="tag g">quantisation only</span>');
+    push("loop closure", (st.closure * 1000).toFixed(1) + " &micro;m");
+    push("net heading", (st.netTheta * DEG).toFixed(2) + "&deg;");
+    push("chassis box", (st.bodyBox[2] - st.bodyBox[0]).toFixed(0) + " &times; " + (st.bodyBox[3] - st.bodyBox[1]).toFixed(0) + " mm");
+    push("sharp vertices", st.corners + (st.corners ? " (decel to zero at each)" : ""));
+    if (st.tight)
+      out.push(`<div><span class="tag w">r &lt; p</span> ${st.tightLen.toFixed(1)} mm of path (${(100 * st.tightLen / st.pathLen).toFixed(0)}%) is tighter than p = ${p} mm &mdash; no steady crab angle exists there, the motion is an oscillation with wheel reversals.</div>`);
+  }
+  for (const [cls, msg] of S.warn) out.push(`<div><span class="tag ${cls}">warn</span> ${msg}</div>`);
+  $("diag").innerHTML = out.join("");
+
+  /* font-strategy explainer, kept live because the numbers move with p */
+  const body = $("frame").value === "body";
+  const eTo = (a, b) => CFG.p * Math.log(Math.tan(a / 2 / DEG) / Math.tan(b / 2 / DEG));
+  $("fontnote").innerHTML = body
+    ? `A fixed body-frame program is <b>exactly</b> pose-invariant &mdash; same steps from ` +
+      `any position or heading &mdash; but the glyph lands rotated by the heading on arrival, ` +
+      `about its first pen-down point. Run-in is the only lever: heading converges toward the ` +
+      `direction of travel with length scale p = ${CFG.p} mm, so 30&deg;&rarr;2&deg; costs ` +
+      `${eTo(30, 2).toFixed(0)} mm of pen-up approach. A spin on the spot is the cheapest ` +
+      `possible correction at ${(CFG.p / DEG).toFixed(2)} mm of pen arc per degree.`
+    : `World-exact recomputes the inverse transform per glyph, so letters are upright ` +
+      `regardless of heading. On a Pi Zero this is ~600 chords/s of trig at vMax &mdash; ` +
+      `not a bottleneck. Switch to body-fixed to see what a replayable program costs you.`;
+}
+
+/* ==========================================================================
+   CHARTS
+   ========================================================================== */
+function chartFrame(c, pad) {
+  const x = c.getContext("2d"), w = c.width / DPR, h = c.height / DPR;
+  x.setTransform(DPR, 0, 0, DPR, 0, 0);
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = "#171b21"; x.fillRect(0, 0, w, h);
+  return { x, w, h, l: pad[0], t: pad[1], r: w - pad[2], b: h - pad[3] };
+}
+function axisText(f, s, X, Y, col, align) {
+  f.x.fillStyle = col || "#5d6875";
+  f.x.font = "9.5px ui-monospace,monospace";
+  f.x.textAlign = align || "left";
+  f.x.fillText(s, X, Y);
+  f.x.textAlign = "left";
+}
+
+function paintCharts() { chartWheels(); chartErr(); chartRhomb(); }
+
+function chartWheels() {
+  const c = $("chWheels"), f = chartFrame(c, [34, 20, 8, 16]);
+  const r = S.run; if (!r || r.tTotal <= 0) return;
+  let vm = CFG.vMax;
+  for (let i = 1; i < r.n; i++) vm = Math.max(vm, Math.abs(r.vL[i]), Math.abs(r.vR[i]));
+  vm *= 1.08;
+  const X = t => f.l + (f.r - f.l) * t / r.tTotal;
+  const Y = v => (f.t + f.b) / 2 - v / vm * (f.b - f.t) / 2;
+  /* zero + vMax guides */
+  f.x.strokeStyle = "#2a313b"; f.x.lineWidth = 1;
+  f.x.beginPath(); f.x.moveTo(f.l, Y(0)); f.x.lineTo(f.r, Y(0)); f.x.stroke();
+  f.x.strokeStyle = "#39424e"; f.x.setLineDash([3, 3]);
+  f.x.beginPath();
+  f.x.moveTo(f.l, Y(CFG.vMax)); f.x.lineTo(f.r, Y(CFG.vMax));
+  f.x.moveTo(f.l, Y(-CFG.vMax)); f.x.lineTo(f.r, Y(-CFG.vMax));
+  f.x.stroke(); f.x.setLineDash([]);
+  const step = Math.max(1, Math.ceil(r.n / Math.max(2, (f.r - f.l) * 2)));
+  for (const [arr, col] of [[r.vL, "#4fb8ff"], [r.vR, "#ff9c4f"]]) {
+    f.x.strokeStyle = col; f.x.lineWidth = 1.1; f.x.beginPath();
+    f.x.moveTo(X(0), Y(0));
+    for (let i = 1; i < r.n; i += step) f.x.lineTo(X(r.t[i]), Y(arr[i]));
+    f.x.stroke();
+  }
+  /* playhead */
+  const px = X(clamp(S.tNow, 0, r.tTotal));
+  f.x.strokeStyle = "#dfe5ec"; f.x.lineWidth = 1;
+  f.x.beginPath(); f.x.moveTo(px, f.t); f.x.lineTo(px, f.b); f.x.stroke();
+  axisText(f, "+" + vm.toFixed(0), 4, f.t + 8);
+  axisText(f, "0", 4, Y(0) + 3);
+  axisText(f, "-" + vm.toFixed(0), 4, f.b);
+  axisText(f, "vMax", f.r - 2, Y(CFG.vMax) - 3, "#39424e", "right");
+  axisText(f, r.tTotal.toFixed(1) + " s", f.r - 2, f.h - 4, "#5d6875", "right");
+}
+
+function chartErr() {
+  const c = $("chErr"), f = chartFrame(c, [34, 20, 8, 16]);
+  const r = S.run; if (!r) return;
+  const sT = r.s[r.n - 1] || 1;
+  const X = s => f.l + (f.r - f.l) * s / sT;
+  const Y = e => (f.t + f.b) / 2 - e / 185 * (f.b - f.t) / 2;   // deg, +/-185
+  /* +/-180 and 0 guides */
+  f.x.strokeStyle = "#2a313b"; f.x.beginPath();
+  f.x.moveTo(f.l, Y(0)); f.x.lineTo(f.r, Y(0)); f.x.stroke();
+  f.x.strokeStyle = "#242b34"; f.x.setLineDash([2, 4]); f.x.beginPath();
+  for (const v of [90, -90, 180, -180]) { f.x.moveTo(f.l, Y(v)); f.x.lineTo(f.r, Y(v)); }
+  f.x.stroke(); f.x.setLineDash([]);
+
+  /* equilibrium crab angle where one exists: sin(e*) = -kappa*p, cos(e*)>0 */
+  f.x.strokeStyle = "rgba(110,231,168,.55)"; f.x.lineWidth = 1; f.x.beginPath();
+  let open = false;
+  const step = Math.max(1, Math.ceil(r.n / Math.max(2, (f.r - f.l) * 2)));
+  for (let i = 1; i < r.n; i += step) {
+    const q = -r.kap[i] * CFG.p;
+    if (Math.abs(q) <= 1) {
+      const e = Math.asin(q) * DEG;
+      if (!open) { f.x.moveTo(X(r.s[i]), Y(e)); open = true; } else f.x.lineTo(X(r.s[i]), Y(e));
+    } else open = false;
+  }
+  f.x.stroke();
+  /* no-equilibrium bands */
+  f.x.fillStyle = "rgba(255,209,102,.10)";
+  for (let i = 1; i < r.n; i += step)
+    if (Math.abs(r.kap[i] * CFG.p) > 1)
+      f.x.fillRect(X(r.s[i]), f.t, Math.max(1, (f.r - f.l) * step * r.dsp[i] / sT), f.b - f.t);
+  /* actual e */
+  f.x.strokeStyle = "#b57fe8"; f.x.lineWidth = 1.2; f.x.beginPath();
+  f.x.moveTo(X(0), Y(r.err[1] * DEG));
+  for (let i = 1; i < r.n; i += step) f.x.lineTo(X(r.s[i]), Y(r.err[i] * DEG));
+  f.x.stroke();
+  const i = idxAtTime(r, S.tNow), px = X(r.s[i]);
+  f.x.strokeStyle = "#dfe5ec"; f.x.lineWidth = 1;
+  f.x.beginPath(); f.x.moveTo(px, f.t); f.x.lineTo(px, f.b); f.x.stroke();
+  axisText(f, "+180", 4, f.t + 8); axisText(f, "0", 4, Y(0) + 3); axisText(f, "-180", 4, f.b);
+  axisText(f, sT.toFixed(0) + " mm", f.r - 2, f.h - 4, "#5d6875", "right");
+  axisText(f, "e*", f.l + 3, Y(0) - 4, "rgba(110,231,168,.8)");
+}
+
+function chartRhomb() {
+  const c = $("chRhomb"), f = chartFrame(c, [8, 18, 8, 8]);
+  const r = S.run;
+  const V = CFG.vMax, side = 2 * CFG.p / CFG.d * V;
+  const M = Math.max(V, side) * 1.15;
+  const cxp = (f.l + f.r) / 2, cyp = (f.t + f.b) / 2;
+  const sc = Math.min((f.r - f.l), (f.b - f.t)) / 2 / M;
+  const X = v => cxp + v * sc, Y = v => cyp - v * sc;   // x = fwd, y = lateral
+  f.x.strokeStyle = "#2a313b"; f.x.lineWidth = 1;
+  f.x.beginPath(); f.x.moveTo(f.l, cyp); f.x.lineTo(f.r, cyp);
+  f.x.moveTo(cxp, f.t); f.x.lineTo(cxp, f.b); f.x.stroke();
+  f.x.beginPath();
+  f.x.moveTo(X(V), Y(0)); f.x.lineTo(X(0), Y(side));
+  f.x.lineTo(X(-V), Y(0)); f.x.lineTo(X(0), Y(-side)); f.x.closePath();
+  f.x.fillStyle = "rgba(79,184,255,.09)"; f.x.fill();
+  f.x.strokeStyle = "#4fb8ff"; f.x.lineWidth = 1.2; f.x.stroke();
+  /* the circle a naive clamp would assume */
+  f.x.strokeStyle = "rgba(255,107,107,.35)"; f.x.setLineDash([2, 3]);
+  f.x.beginPath(); f.x.arc(cxp, cyp, V * sc, 0, TAU); f.x.stroke(); f.x.setLineDash([]);
+  if (r) {
+    const i = idxAtTime(r, S.tNow);
+    const v = (r.vR[i] + r.vL[i]) / 2, om = (r.vR[i] - r.vL[i]) / CFG.d;
+    f.x.fillStyle = "#6ee7a8";
+    f.x.beginPath(); f.x.arc(X(v), Y(CFG.p * om), 3.4, 0, TAU); f.x.fill();
+    f.x.strokeStyle = "rgba(110,231,168,.4)"; f.x.lineWidth = 1;
+    f.x.beginPath(); f.x.moveTo(cxp, cyp); f.x.lineTo(X(v), Y(CFG.p * om)); f.x.stroke();
+  }
+  axisText(f, "fwd v", X(M * .55), cyp - 4, "#4a5563");
+  axisText(f, "p·ω", cxp + 4, Y(M * .72), "#4a5563");
+}
+
+/* ==========================================================================
+   DIRECTION COMPARISON
+   ========================================================================== */
+function compare() {
+  readCfg();
+  const rows = [];
+  for (const rev of [false, true]) {
+    const b = makeRun(rev);
+    rows.push(b ? { rev, t: b.tTotal, ...b.stats } : null);
+  }
+  const [A, B] = rows;
+  if (!A || !B) { $("dirnote").textContent = "Path too large to compare."; return; }
+  const metrics = [
+    ["run time", r => r.t.toFixed(2) + " s", true],
+    ["wheel travel", r => r.wheelTravel.toFixed(0) + " mm", true],
+    ["peak |e|", r => (r.peakE * DEG).toFixed(1) + "°", true],
+    ["settle s", r => r.settle.toFixed(0) + " mm", true],
+    ["chassis box", r => (r.bodyBox[2] - r.bodyBox[0]).toFixed(0) + "×" + (r.bodyBox[3] - r.bodyBox[1]).toFixed(0), false],
+    ["max x-track", r => (r.maxCT * 1000).toFixed(1) + " µm", false],
+    ["closure", r => (r.closure * 1000).toFixed(1) + " µm", false]
+  ];
+  const raw = [
+    r => r.t, r => r.wheelTravel, r => r.peakE, r => r.settle,
+    r => (r.bodyBox[2] - r.bodyBox[0]) * (r.bodyBox[3] - r.bodyBox[1]),
+    r => r.maxCT, r => r.closure
+  ];
+  let html = "<tr><th>metric</th><th>forward</th><th>reversed</th></tr>";
+  metrics.forEach(([name, f], k) => {
+    const a = raw[k](A), b = raw[k](B);
+    const aw = a < b * 0.999, bw = b < a * 0.999;
+    html += `<tr><td>${name}</td><td${aw ? ' style="color:var(--ok)"' : ""}>${f(A)}</td>` +
+            `<td${bw ? ' style="color:var(--ok)"' : ""}>${f(B)}</td></tr>`;
+  });
+  $("dirtab").innerHTML = html;
+  const win = B.t < A.t ? "reversed" : "forward";
+  const gain = 100 * Math.abs(A.t - B.t) / Math.max(A.t, B.t);
+  $("dirnote").innerHTML =
+    `<b>${win}</b> is ${gain.toFixed(1)}% quicker. Cross-track is quantisation only in both ` +
+    `directions &mdash; the pen tracks either way. What direction actually changes is the ` +
+    `heading transient and where the chassis swings. See <b>direction.md</b>.`;
+}
+
+/* ==========================================================================
+   SELF-TESTS  (maths.md §7)
+   ========================================================================== */
+function runTests() {
+  const box = $("tests"); box.style.display = "block";
+  const out = []; let pass = 0, fail = 0;
+  const ok = (name, got, want, tol, unit) => {
+    const good = Math.abs(got - want) <= tol;
+    good ? pass++ : fail++;
+    out.push(`<span class="${good ? "pass" : "fail"}">${good ? "PASS" : "FAIL"}</span> ${name}` +
+      `  got ${typeof got === "number" ? got.toPrecision(7) : got} want ${want}${unit || ""}`);
+  };
+  const hdr = s => out.push(`<span class="hdr">— ${s} —</span>`);
+
+  const save = { ...CFG };
+  CFG.d = 84; CFG.p = 55;
+
+  /* 1. inverse transform table, theta = 90 deg */
+  hdr("inverse transform, theta = 90°");
+  const th90 = Math.PI / 2;
+  for (const [vx, vy, wR, wL] of [
+    [0, 10, 10, 10], [10, 0, -7.636364, 7.636364], [-10, 0, 7.636364, -7.636364],
+    [7.071068, 7.071068, 1.671336, 12.470799], [7.947, 6.068, 0, 12.136937], [0, 0, 0, 0]
+  ]) {
+    const q = inverse(vx, vy, th90);
+    ok(`(${vx},${vy}) v_R`, q.vR, wR, 1e-3);
+    ok(`(${vx},${vy}) v_L`, q.vL, wL, 1e-3);
+  }
+
+  /* 2. round trip */
+  hdr("inverse → forward round trip");
+  let worst = 0;
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let k = 0; k < 400; k++) {
+    const vx = (rnd() - .5) * 60, vy = (rnd() - .5) * 60, t0 = (rnd() - .5) * 8;
+    const q = inverse(vx, vy, t0), b = forward(q.vL, q.vR, t0);
+    worst = Math.max(worst, Math.abs(b.vxp - vx), Math.abs(b.vyp - vy));
+  }
+  ok("worst round-trip residual (400 random)", worst, 0, 1e-9);
+
+  /* 3. derived constants */
+  hdr("derived constants");
+  CFG.wheelDia = 34; CFG.stepsPerRev = 200; CFG.microsteps = 16;
+  ok("lambda", lam(), Math.PI * 34 / 3200, 1e-12, " mm  (spec quotes 0.033378, 5 sf)");
+  ok("lateral pen resolution", CFG.p * lam() / CFG.d * 1000, 21.86, 0.1, " µm");
+  ok("steps per full spin", Math.PI * CFG.d / lam(), 7906, 2);
+  ok("sideways envelope factor", 2 * CFG.p / CFG.d, 1.309524, 1e-4);
+  ok("diagonal envelope factor", Math.SQRT2 / (1 + CFG.d / (2 * CFG.p)), 0.801875, 1e-4);
+  ok("one-wheel-stopped direction", Math.atan(2 * CFG.p / CFG.d) * DEG, 52.639, 1e-2, "°");
+
+  /* 4. 5 mm diameter circle */
+  hdr("5 mm diameter circle (a = 2.5 mm)");
+  const a = 2.5;
+  const circ = flatten([{ pts: arcPts(0, 0, a, a, 0, 360, 4000), draw: true }], 0.01, false);
+  const rc = build(circ, Math.atan2(circ.Y[1] - circ.Y[0], circ.X[1] - circ.X[0]), 90);
+  let yaw = 0, rmax = 0;
+  for (let i = 1; i < rc.n; i++) {
+    yaw = Math.max(yaw, Math.abs(wrapPi(rc.thP[i] - rc.thP[0])));
+    rmax = Math.max(rmax, Math.abs(rc.rL[i]), Math.abs(rc.rR[i]));
+  }
+  /* The lap starts at e = 0, which is an extremum of theta, so the excursion
+     from the start is the full peak-to-peak swing.  Exact:
+       dtheta = integral_0^pi  b sin w /(1 - b sin w) dw
+              = 2b + pi b^2/2 + 4 b^3/3 + ...      with b = a/p
+     maths.md quotes a/p = 2.604°, which is the leading-order *amplitude* —
+     correct to first order and 3.7% low at this b. */
+  const b = a / CFG.p;
+  const yawExact = 2 * b + Math.PI * b * b / 2 + 4 * b * b * b / 3;
+  ok("peak-to-peak yaw", yaw * DEG, yawExact * DEG, 0.01, "°  (2a/p + O(b²))");
+  ok("yaw amplitude vs a/p", yaw / 2, b, b * 0.05, " rad  (a/p, leading order)");
+  ok("peak wheel/pen speed ratio", rmax, 1.258361, 2e-3);
+  /* phase separation: heading error at the two ratio maxima, 2·atan(d/2p) */
+  let iL = 1, iR = 1;
+  for (let i = 1; i < rc.n; i++) {
+    if (rc.rL[i] > rc.rL[iL]) iL = i;
+    if (rc.rR[i] > rc.rR[iR]) iR = i;
+  }
+  ok("v_L / v_R phase separation", Math.abs(wrapPi(rc.err[iL] - rc.err[iR])) * DEG,
+     2 * Math.atan(CFG.d / (2 * CFG.p)) * DEG, 1.5, "°");
+  ok("loop closure", rc.stats.closure * 1000, 0, 20, " µm");
+  ok("net heading change", Math.abs(rc.stats.netTheta) * DEG, 0, 0.5, "°");
+  const revs = arr => { let c = 0; for (let i = 2; i < rc.n; i++) if (arr[i] * arr[i - 1] < 0) c++; return c; };
+  ok("v_L direction reversals per lap", revs(rc.rL), 2, 0);
+  ok("v_R direction reversals per lap", revs(rc.rR), 2, 0);
+
+  /* 5. heading convergence on a straight line, e0 = 90 deg */
+  hdr("heading convergence, straight line, e0 = 90°");
+  const ln = flatten([{ pts: [[0, 0], [200, 0]], draw: true }], 0.02, false);
+  const rl = build(ln, Math.PI / 2, 90);
+  const eAt = target => {
+    let i = 1; while (i < rl.n - 1 && rl.s[i] < target) i++;
+    return Math.abs(rl.err[i]) * DEG;
+  };
+  ok("|e| at s = 55 mm", eAt(55), 40.409, 0.1, "°");
+  ok("|e| at s = 110 mm", eAt(110), 15.420, 0.1, "°");
+  ok("|e| at s = 165 mm", eAt(165), 5.740, 0.1, "°");
+  ok("max pen cross-track (quantisation only)", rl.stats.maxCT * 1000, 0, 25, " µm");
+
+  /* 6. constant-ratio arc: fit a circle to the pen trail */
+  hdr("constant-ratio arc, R_pen = sqrt(R_axle² + p²)");
+  for (const Raxle of [0, 40, 150]) {
+    const N = 4000, dsTot = TAU * Math.hypot(Raxle, CFG.p) * 1.0;
+    const ds = 0.02;
+    let X0 = 0, Y0 = 0, T = 0;
+    const xs = [], ys = [];
+    const dth = Raxle === 0 ? ds / CFG.p : ds / Raxle;   // per step of axle travel ds
+    for (let i = 0; i < N; i++) {
+      const dsA = Raxle === 0 ? 0 : ds, dt = Raxle === 0 ? ds / CFG.p : dth;
+      if (Math.abs(dt) < 1e-12) { X0 += dsA * Math.cos(T); Y0 += dsA * Math.sin(T); }
+      else {
+        const R = dsA / dt;
+        X0 += R * (Math.sin(T + dt) - Math.sin(T));
+        Y0 += R * (Math.cos(T) - Math.cos(T + dt));
+      }
+      T += dt;
+      xs.push(X0 + CFG.p * Math.cos(T)); ys.push(Y0 + CFG.p * Math.sin(T));
+    }
+    /* Kåsa algebraic circle fit */
+    let Sx = 0, Sy = 0, Sxx = 0, Syy = 0, Sxy = 0, Sxz = 0, Syz = 0, Sz = 0;
+    const m = xs.length;
+    for (let i = 0; i < m; i++) {
+      const x = xs[i], y = ys[i], z = x * x + y * y;
+      Sx += x; Sy += y; Sxx += x * x; Syy += y * y; Sxy += x * y; Sxz += x * z; Syz += y * z; Sz += z;
+    }
+    const A11 = 2 * (Sxx - Sx * Sx / m), A12 = 2 * (Sxy - Sx * Sy / m), A22 = 2 * (Syy - Sy * Sy / m);
+    const B1 = Sxz - Sx * Sz / m, B2 = Syz - Sy * Sz / m;
+    const det = A11 * A22 - A12 * A12;
+    const fx = (B1 * A22 - B2 * A12) / det, fy = (A11 * B2 - A12 * B1) / det;
+    let rr = 0; for (let i = 0; i < m; i++) rr += Math.hypot(xs[i] - fx, ys[i] - fy);
+    rr /= m;
+    ok(`R_axle = ${Raxle} → R_pen`, rr, Math.hypot(Raxle, CFG.p), 0.05, " mm");
+  }
+  ok("tightest constant-ratio pen circle", CFG.p, 55, 1e-9, " mm (spin on the spot)");
+
+  Object.assign(CFG, save);
+  out.unshift(`<span class="${fail ? "fail" : "pass"}">${pass} passed, ${fail} failed</span>`);
+  box.innerHTML = out.join("\n");
+  rebuild();
+}
+
+/* ==========================================================================
+   EXPORT — waypoints, not step pulses (maths.md §4.6)
+   ========================================================================== */
+function waypoints() {
+  const r = S.run; if (!r) return [];
+  const out = [{ t_ms: 0, nL: 0, nR: 0, penDown: r.D[1] ? 1 : 0 }];
+  let lL = 0, lR = 0, lD = r.D[1];
+  for (let i = 1; i < r.n; i++) {
+    const dchg = r.D[i] !== lD;
+    if (r.NL[i] !== lL || r.NR[i] !== lR || dchg || r.stop[i]) {
+      out.push({ t_ms: +(r.t[i] * 1000).toFixed(3), nL: r.NL[i], nR: r.NR[i], penDown: r.D[i] ? 1 : 0 });
+      lL = r.NL[i]; lR = r.NR[i]; lD = r.D[i];
+    }
+  }
+  return out;
+}
+function download(name, text, mime) {
+  const b = new Blob([text], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ==========================================================================
+   UI WIRING
+   ========================================================================== */
+renderParams();
+$("src").onchange = () => { renderParams(); S.view.set = false; rebuild(); };
+for (const id of ["e0", "dir", "corner", "frame", "runin"]) $(id).oninput = rebuild;
+$("optdirs").onchange = rebuild;
+$("frame").onchange = rebuild;
+for (const k of CFG_KEYS) { const el = $("c_" + k); if (el) el.oninput = rebuild; }
+$("rebuild").onclick = () => { S.view.set = false; rebuild(); };
+$("fit").onclick = () => { S.view.set = false; fitView(); draw(); };
+for (const id of ["t_axle", "t_icc", "t_target", "t_grid", "t_tight"])
+  $(id).onchange = draw;
+$("t_ghost").onchange = rebuild;
+$("cmp").onclick = compare;
+$("runtests").onclick = runTests;
+$("expcsv").onclick = () => {
+  const w = waypoints();
+  download("penbot.csv", "t_ms,nL,nR,penDown\n" +
+    w.map(q => `${q.t_ms},${q.nL},${q.nR},${q.penDown}`).join("\n") + "\n", "text/csv");
+};
+$("expjson").onclick = () => download("penbot.json",
+  JSON.stringify({ config: { ...CFG, lambda: lam() }, waypoints: waypoints() }, null, 1),
+  "application/json");
+
+$("play").onclick = () => {
+  const r = S.run; if (!r) return;
+  if (S.tNow >= r.tTotal - 1e-9) S.tNow = 0;
+  S.playing = !S.playing;
+  $("play").textContent = S.playing ? "Pause" : "Play";
+};
+$("rst").onclick = () => { S.tNow = 0; S.playing = false; $("play").textContent = "Play"; sync(); };
+$("stepf").onclick = () => { nudge(1); };
+$("stepb").onclick = () => { nudge(-1); };
+function nudge(dir) {
+  const r = S.run; if (!r) return;
+  S.playing = false; $("play").textContent = "Play";
+  let i = idxAtTime(r, S.tNow) + dir * Math.max(1, Math.round(r.n / 400));
+  S.tNow = r.t[clamp(i, 0, r.n - 1)];
+  sync();
+}
+$("scrub").oninput = () => {
+  const r = S.run; if (!r) return;
+  S.tNow = r.tTotal * $("scrub").value / 1000;
+  S.playing = false; $("play").textContent = "Play";
+  draw(); paintCharts();
+};
+$("speed").oninput = () => {
+  S.speed = Math.pow(10, $("speed").value / 100);
+  $("speedv").textContent = (S.speed < 1 ? S.speed.toFixed(2) : S.speed.toFixed(1)) + "×";
+};
+function sync() {
+  const r = S.run; if (!r) return;
+  $("scrub").value = r.tTotal > 0 ? Math.round(1000 * S.tNow / r.tTotal) : 0;
+  draw(); paintCharts();
+}
+
+/* pan / zoom */
+let drag = null;
+cv.addEventListener("mousedown", e => { drag = { x: e.clientX, y: e.clientY, cx: S.view.cx, cy: S.view.cy }; cv.classList.add("drag"); });
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  S.view.cx = drag.cx - (e.clientX - drag.x) / S.view.scale;
+  S.view.cy = drag.cy + (e.clientY - drag.y) / S.view.scale;
+  S.view.set = true; draw();
+});
+window.addEventListener("mouseup", () => { drag = null; cv.classList.remove("drag"); });
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const wx0 = wx(mx), wy0 = wy(my);
+  S.view.scale *= Math.exp(-e.deltaY * 0.0014);
+  S.view.scale = clamp(S.view.scale, 0.05, 400);
+  S.view.cx = wx0 - (mx - W / 2) / S.view.scale;
+  S.view.cy = wy0 + (my - H / 2) / S.view.scale;
+  S.view.set = true; draw();
+}, { passive: false });
+
+window.addEventListener("keydown", e => {
+  if (/input|textarea|select/i.test(e.target.tagName)) return;
+  if (e.code === "Space") { e.preventDefault(); $("play").click(); }
+  else if (e.code === "ArrowRight") nudge(1);
+  else if (e.code === "ArrowLeft") nudge(-1);
+  else if (e.key === "f") $("fit").click();
+});
+
+/* animation loop */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  if (S.playing && S.run) {
+    S.tNow += dt * S.speed;
+    if (S.tNow >= S.run.tTotal) { S.tNow = S.run.tTotal; S.playing = false; $("play").textContent = "Play"; }
+    sync();
+  }
+  requestAnimationFrame(frame);
+}
+new ResizeObserver(resize).observe(document.getElementById("stage"));
+resize();
+rebuild();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
