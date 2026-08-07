@@ -32,3 +32,8 @@ and one where it's fed from its PSU via umbillical.
 ## 3. Pi sits remote from robot
 
 Feeds board signals via umbillical. Too complicated!
+
+## 4. Use 3.7V batteries that I have for the wee camera? They're rechargeable,
+
+Very lightweight and should be able to power these devices. I can use one
+of the pi and one for the motors
