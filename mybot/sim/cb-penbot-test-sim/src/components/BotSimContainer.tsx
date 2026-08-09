@@ -9,9 +9,14 @@ export const BotSimContainer = () => {
     const [states, setStates] = useState<BotPosition[]>([]);
     const [bot, setBot] = useState<Bot>(new Bot());
 
+    const expand = (instructions: string) => 
+        instructions.replaceAll(/(\D)(\d+)/g, (_,c,n) => 
+        c.repeat(parseInt(n)));
+    
+
     const onSubmit = (formData: FormValues) => {
         const bot = new Bot(formData);
-        const r = bot.bresenham(formData.instructions);
+        const r = bot.bresenham(expand(formData.instructions));
         setStates(r);
         setBot(bot);
     }

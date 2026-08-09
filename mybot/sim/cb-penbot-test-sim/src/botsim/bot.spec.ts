@@ -177,6 +177,44 @@ describe('Bot Bresenham processing', ()=>{
         expect(bot._positionX).toBeCloseTo(-0.005);
         expect(bot._positionY).toBeCloseTo(1);
     })
+    it('should calculate the correct x,y translation for C', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = 0; // puts pen central... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the right wheel
+        bot.bresenham('C');
+        expect(bot._positionX).toBeCloseTo(-0.04);
+        expect(bot._positionY).toBeCloseTo(-2);
+    })
+    it('should calculate the correct x,y translation for c', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = 0; // puts pen central... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the right wheel
+        bot.bresenham('c');
+        expect(bot._positionX).toBeCloseTo(-0.04);
+        expect(bot._positionY).toBeCloseTo(2);
+    })
     it('should calculate the correct x translation for B', () =>{
         const testWheelDiameter = 2037.885 / Math.PI;
         const bot = new Bot({

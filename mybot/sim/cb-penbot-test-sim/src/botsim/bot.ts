@@ -43,7 +43,7 @@ export const LashState = {
 };
 type Lash = typeof LashState.TBD | typeof LashState.CW | typeof LashState.CCW;
 
-type breselhamChar = 'L' | 'l' | 'R' | 'r' | 'B' | 'b';
+type breselhamChar = 'L' | 'l' | 'R' | 'r' | 'B' | 'b' | 'C' | 'c';
 type stepper = () => void;
 type breselhamMap = {
     [char in breselhamChar]: stepper;
@@ -59,7 +59,7 @@ export interface BotProps {
 
 export const defaultBotProps: BotProps = {
     wheelDiameter: 36,
-    axleWidth: 48,
+    axleWidth: 84,
     deadband: 10,
     penDistanceFromAxle: 55,
     penOffsetFromCenterline: 0.0
@@ -97,6 +97,7 @@ export class Bot {
 
     _leftWheelPolarFromPen: Polar = {r: 0, t: 0};
     _rightWheelPolarFromPen: Polar = {r: 0, t: 0};
+    _axleMidpointPolarFromPen: Polar = {r: 0, t: 0};
     _singleStepAngle: number = 0.0;
 
     constructor(props: BotProps|undefined = undefined){
@@ -120,6 +121,7 @@ export class Bot {
 
         this._leftWheelPolarFromPen = c2p({x: wheelX, y: leftWheelY});
         this._rightWheelPolarFromPen = c2p({x: wheelX, y: rightWheelY});
+        this._axleMidpointPolarFromPen = c2p({x: wheelX, y: (leftWheelY+rightWheelY)/2});
 
         this._singleStepAngle = this._wheelStepMm / this._axleWidth;
     }
@@ -131,6 +133,8 @@ export class Bot {
     _rotateAroundLeftWheel = (angle: number) => this._rotateAroundWheel(angle, this._leftWheelPolarFromPen);
 
     _rotateAroundRightWheel = (angle: number) => this._rotateAroundWheel(angle, this._rightWheelPolarFromPen);
+
+    _rotateAroundAxleMidpoint = (angle: number) => this._rotateAroundWheel(angle, this._axleMidpointPolarFromPen);
 
     _rotateAroundWheel = (angle: number, wheelPolarFromPen: Polar) => {
         // we already know left wheel polar from pen
@@ -194,6 +198,16 @@ export class Bot {
         this._positionY += y;
     }
 
+    stepCw(){
+        this._stepCounter++;
+        this._rotateAroundAxleMidpoint(-this._singleStepAngle*2);
+    }
+
+    stepCcw(){
+        this._stepCounter++;
+        this._rotateAroundAxleMidpoint(this._singleStepAngle*2);
+    }
+
     calculateStepMmAtWheel(): number {
         const wheelCircumference = Math.PI * this._wheelDiameter;
         const stepMmAtWheel = wheelCircumference / stepsPerRevolution;
@@ -208,11 +222,13 @@ export class Bot {
             'r': this.stepBackRight.bind(this),
             'B': this.stepBoth.bind(this),
             'b': this.stepBackBoth.bind(this),
+            'C': this.stepCw.bind(this),
+            'c': this.stepCcw.bind(this),
         };
     };
 
     bresenham = (s: string):BotPosition[] => {
-        if(s.match(/[^LlRrBb]/)){ // eventually Pp will be pen up/down
+        if(s.match(/[^LlRrBbCc]/)){ // eventually Pp will be pen up/down
             throw Error("bresenham string expected only to contain LlRrBb");
         }
         const bm = this.bMap();
