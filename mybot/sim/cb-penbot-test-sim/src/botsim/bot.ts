@@ -50,11 +50,13 @@ type breselhamMap = {
 };
 
 export interface BotProps {
-        wheelDiameter?: number;
-        axleWidth?: number;
-        deadband?: number;
-        penDistanceFromAxle?: number;
-        penOffsetFromCenterline?: number;
+    wheelDiameter?: number;
+    axleWidth?: number;
+    deadband?: number;
+    penDistanceFromAxle?: number;
+    penOffsetFromCenterline?: number;
+    startX?: number;
+    startY?: number;
 }
 
 export const defaultBotProps: BotProps = {
@@ -62,7 +64,9 @@ export const defaultBotProps: BotProps = {
     axleWidth: 84,
     deadband: 10,
     penDistanceFromAxle: 55,
-    penOffsetFromCenterline: 0.0
+    penOffsetFromCenterline: 0.0,
+    startX: 0,
+    startY: 0,
 }
 
 export class Bot {
@@ -78,7 +82,7 @@ export class Bot {
 
     // all real-world measurements are in millimeters.
     _wheelDiameter: number = 36;
-    _axleWidth: number = 48;
+    _axleWidth: number = 84;
     _deadband: number = 10; // whole-steps
     // TODO: measure irl deadband in terms of steps
     _penDistanceFromAxle: number = 55;
@@ -111,6 +115,8 @@ export class Bot {
         this._deadband = deadband!;
         this._penDistanceFromAxle = penDistanceFromAxle!;
         this._penOffsetFromCenterline = penOffsetFromCenterline!;
+        this._positionX = props?.startX!
+        this._positionY = props?.startY!
 
         // bot starts with pen at origin, facing along positive x.
         this._wheelStepMm = this.calculateStepMmAtWheel();
@@ -229,7 +235,7 @@ export class Bot {
 
     bresenham = (s: string):BotPosition[] => {
         if(s.match(/[^LlRrBbCc]/)){ // eventually Pp will be pen up/down
-            throw Error("bresenham string expected only to contain LlRrBb");
+            throw Error("bresenham string expected only to contain LlRrBbCc");
         }
         const bm = this.bMap();
         const list:BotPosition[] = [];

@@ -13,6 +13,8 @@ export interface FormValues {
     penDistanceFromAxle: number
     penOffsetFromCenterline: number
     deadband: number
+    startX: number
+    startY: number
 }
 
 export const BotSimForm: React.FC<BotSimFormProps> = (props:BotSimFormProps) => {
@@ -23,8 +25,10 @@ export const BotSimForm: React.FC<BotSimFormProps> = (props:BotSimFormProps) => 
         formState: { errors },
     } = useForm<FormValues>({
         defaultValues: {
-            instructions: '',
-            ...defaultBotProps
+            instructions: 'L1200B3000R1200C4755',
+            ...defaultBotProps,
+            startX: 10,
+            startY: 270
         },
     })
 
@@ -66,6 +70,18 @@ export const BotSimForm: React.FC<BotSimFormProps> = (props:BotSimFormProps) => 
           <Field.Label>Motor Lash</Field.Label>
           <Input {...register("deadband", { valueAsNumber: true })} />
           <Field.ErrorText>{errors.deadband?.message}</Field.ErrorText>
+        </Field.Root>
+
+        <Field.Root invalid={!!errors.startX}>
+          <Field.Label>Start X</Field.Label>
+          <Input {...register("startX", { valueAsNumber: true })} />
+          <Field.ErrorText>{errors.startX?.message}</Field.ErrorText>
+        </Field.Root>
+
+        <Field.Root invalid={!!errors.startY}>
+          <Field.Label>Start Y</Field.Label>
+          <Input {...register("startY", { valueAsNumber: true })} />
+          <Field.ErrorText>{errors.startY?.message}</Field.ErrorText>
         </Field.Root>
 
         <Button type="submit">Submit</Button>

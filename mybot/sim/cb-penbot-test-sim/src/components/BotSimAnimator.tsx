@@ -66,11 +66,18 @@ export const BotSimAnimator: React.FC<BotSimAnimatorProps> = ({states, bot}: Bot
     const bodyY = bodyMiddle - bodyWidth/2;
     const bodyX = axleX - 10;
     const bodyLength = bot._penDistanceFromAxle + 10;
+    const xLines = [...Array(56).keys()].map(x => x*10 - 295);
+    const yLines = [...Array(39).keys()].map(x => x*10 - 337);
 
-    return  <svg viewBox="-100 -100 200 300" width="400" height="600" >
+    return  <svg viewBox="-300 -347 560 397" 
+                width="710" height="497" 
+                style={{'background':'darkgreen'}}>
+        {xLines.map(x => <line key={`xline-${x}`} x1={x} x2={x} y1={-340} y2={45} stroke="seagreen" />)}
+        {yLines.map(y => <line key={`yline-${y}`} x1={-295} x2={255} y1={y} y2={y} stroke="seagreen" />)}
         <g transform="scale(1, -1)">
+            <rect fill="aliceblue" x="0" y="0" width={210} height={297} />
             <path ref={pathRef} fill="none" stroke="blue" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            <g ref={botRef}>
+            <g ref={botRef} transform="translate(10,270)">
                 <circle r="5" stroke="blue" strokeWidth="0.5" fill="none" />
                 <circle r="1.5" fill="blue" />
                 <line x1="-5" x2="5" stroke="blue" strokeWidth="0.5" />
