@@ -216,9 +216,14 @@ export class Bot {
             throw Error("bresenham string expected only to contain LlRrBb");
         }
         const bm = this.bMap();
+        const list:BotPosition[] = [];
         for(const c of s.split('') as breselhamChar[]){
             bm[c]();
+            list.push({
+                'orientation': this._orientation,
+                'pen': {'x': this._positionX, 'y': this._positionY}
+            })
         }
-        return []; // do to: make this return an array of the positions/orientations travelled through
+        return list;
     }
 }

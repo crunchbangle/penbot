@@ -101,7 +101,6 @@ describe('Bot step counting', () => {
 });
 
 describe('Bot Bresenham processing', ()=>{
-    
     it('should calculate the correct x,y translation for R', () =>{
         const testWheelDiameter = 2037.885 / Math.PI;
         const wheelSeparation = 50;
@@ -223,5 +222,62 @@ describe('Bot Bresenham processing', ()=>{
         bot.bresenham('b');
         expect(bot._positionX).toBeCloseTo(0);
         expect(bot._positionY).toBeCloseTo(-1);
+    })
+    it.for(['L','l','R','r'])
+    ('should draw a full circle with the right number of steps (%s)', (c:string)=>{
+        const testWheelDiameter = 2037.885 / Math.PI; // 1mm per step
+        const axelWidth = 50/Math.PI; // 100mm cirucumference
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": axelWidth
+        });
+        const L10 = c+c+c+c+c + c+c+c+c+c;
+        const L50 = L10 + L10 + L10 + L10 + L10;
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham(L50);
+        expect(bot._positionX).not.toBeCloseTo(0);
+        expect(bot._positionY).not.toBeCloseTo(0);
+        bot.bresenham(L50);
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+    })
+    it.for([
+        ['L','R'],['R','L'],['L','r'],['R','l'],
+        ['l','R'],['r','L'],['l','r'],['r','l']
+    ])
+    ('should draw a full figure 8 with the right number of steps (%s)', (c:string[])=>{
+        const testWheelDiameter = 2037.885 / Math.PI; // 1mm per step
+        const axelWidth = 50/Math.PI; // 100mm cirucumference
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": axelWidth
+        });
+        const L = c[0];
+        const R = c[1];
+        const L10 = L+L+L+L+L + L+L+L+L+L;
+        const R10 = R+R+R+R+R + R+R+R+R+R;
+        const L50 = L10 + L10 + L10 + L10 + L10;
+        const R50 = R10 + R10 + R10 + R10 + R10;
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham(L50);
+        bot.bresenham(R50);
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).not.toBeCloseTo(0);
+        bot.bresenham(R50);
+        bot.bresenham(L50);
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+    })
+    it.for([
+        {'b': 'LLllR', 'l': 5}, 
+        {'b': 'RlRlRlR' , 'l': 7},
+        {'b': 'B', 'l': 1}
+    ])
+    ('should return an array of states, same length as Bresenham steps string (%s)', (e) => {
+        const bot = new Bot();
+        const r = bot.bresenham(e['b']);
+        expect(r).toHaveLength(e['l']);
     })
 })
