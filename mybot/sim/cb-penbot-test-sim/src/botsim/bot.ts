@@ -17,6 +17,11 @@ export type Coords = {
     y: number;
 }
 
+export type BotPosition = {
+    pen: Coords;
+    orientation: number;
+}
+
 const p2c = (p: Polar): Coords => {
     return {
         x: p.r * Math.cos(p.t),
@@ -187,5 +192,27 @@ export class Bot {
         const wheelCircumference = Math.PI * this._wheelDiameter;
         const stepMmAtWheel = wheelCircumference / stepsPerRevolution;
         return stepMmAtWheel;
+    }
+
+    bMap = ():object => {
+        return {
+            'L': this.stepLeft,
+            'l': this.stepBackLeft,
+            'R': this.stepRight,
+            'r': this.stepBackRight,
+            'B': this.stepBoth,
+            'b': this.stepBackBoth,
+        };
+    };
+
+    bresenham = (s: string):BotPosition[] => {
+        if(s.match(/[^LlRrBb]/)){ // eventually Pp will be pen up/down
+            throw Error("bresenham string expected only to contain LlRrBb");
+        }
+        const bm = this.bMap();
+        for(var c of s.split('')){
+            bm[c]();
+        }
+        return []; // do to: make this return an array of the positions/orientations travelled through
     }
 }

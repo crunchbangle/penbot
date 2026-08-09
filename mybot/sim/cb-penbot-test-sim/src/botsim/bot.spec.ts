@@ -19,8 +19,8 @@ describe('Bot core calulations', () => {
     it('should calculate the correct x,y translation for right-step', () =>{
         const testWheelDiameter = 2037.885 / Math.PI;
         const wheelSeparation = 50;
-        const penFromAxle = 40;
-        const penOffset = 5; // puts pen 50 from the left wheel.
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = -25; // puts pen in-line with left wheel... should end up same x (ish), and about y=1
         const bot = new Bot({
             "wheelDiameter": testWheelDiameter,
             "axleWidth": wheelSeparation,
@@ -32,8 +32,27 @@ describe('Bot core calulations', () => {
         
         // should rotate around the left wheel
         bot.stepRight();
-        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionX).toBeCloseTo(-0.005);
         expect(bot._positionY).toBeCloseTo(1);
+    })
+    it('should calculate the correct x,y translation for left-step', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = 25; // puts pen in-line with right wheel... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the right wheel
+        bot.stepLeft();
+        expect(bot._positionX).toBeCloseTo(-0.005);
+        expect(bot._positionY).toBeCloseTo(-1);
     })
     it('should calculate the correct x translation for both-step', () =>{
         const testWheelDiameter = 2037.885 / Math.PI;
@@ -45,6 +64,18 @@ describe('Bot core calulations', () => {
         bot.stepBoth();
         expect(bot._positionX).toBeCloseTo(1);
         expect(bot._positionY).toBeCloseTo(0);
+    })
+    it('should calculate the correct x translation for both-step heading north', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+        });
+        bot._orientation = Math.PI/2; // facing north
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.stepBoth();
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(1);
     })
 })
 
@@ -68,3 +99,129 @@ describe('Bot step counting', () => {
         expect(bot._stepCounter).toBe(6);
     });
 });
+
+describe('Bot Bresenham processing', ()=>{
+    
+    it('should calculate the correct x,y translation for R', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = -25; // puts pen in-line with left wheel... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the left wheel
+        bot.bresenham('R');
+        expect(bot._positionX).toBeCloseTo(-0.005);
+        expect(bot._positionY).toBeCloseTo(1);
+    })
+    it('should calculate the correct x,y translation for L', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = 25; // puts pen in-line with right wheel... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the right wheel
+        bot.bresenham('L');
+        expect(bot._positionX).toBeCloseTo(-0.005);
+        expect(bot._positionY).toBeCloseTo(-1);
+    })
+    it('should calculate the correct x,y translation for r', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = -25; // puts pen in-line with left wheel... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the left wheel
+        bot.bresenham('r');
+        expect(bot._positionX).toBeCloseTo(-0.005);
+        expect(bot._positionY).toBeCloseTo(-1);
+    })
+    it('should calculate the correct x,y translation for l', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const wheelSeparation = 50;
+        const penFromAxle = 50; // puts pen same distance from wheel as other wheel, so they should travel same distance
+        const penOffset = 25; // puts pen in-line with right wheel... should end up same x (ish), and about y=1
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+            "axleWidth": wheelSeparation,
+            "penDistanceFromAxle": penFromAxle,
+            "penOffsetFromCenterline": penOffset
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the right wheel
+        bot.bresenham('l');
+        expect(bot._positionX).toBeCloseTo(-0.005);
+        expect(bot._positionY).toBeCloseTo(1);
+    })
+    it('should calculate the correct x translation for B', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham('B');
+        expect(bot._positionX).toBeCloseTo(1);
+        expect(bot._positionY).toBeCloseTo(0);
+    })
+    it('should calculate the correct x translation for b', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham('b');
+        expect(bot._positionX).toBeCloseTo(-1);
+        expect(bot._positionY).toBeCloseTo(0);
+    })
+    it('should calculate the correct x translation for B heading north', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+        });
+        bot._orientation = Math.PI/2; // facing north
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham('B');
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(1);
+    })
+    it('should calculate the correct x translation for b heading north', () =>{
+        const testWheelDiameter = 2037.885 / Math.PI;
+        const bot = new Bot({
+            "wheelDiameter": testWheelDiameter,
+        });
+        bot._orientation = Math.PI/2; // facing north
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        bot.bresenham('b');
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(-1);
+    })
+})
