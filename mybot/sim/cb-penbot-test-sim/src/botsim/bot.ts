@@ -57,7 +57,7 @@ export interface BotProps {
         penOffsetFromCenterline?: number;
 }
 
-const defaultBotProps: BotProps = {
+export const defaultBotProps: BotProps = {
     wheelDiameter: 36,
     axleWidth: 48,
     deadband: 10,
