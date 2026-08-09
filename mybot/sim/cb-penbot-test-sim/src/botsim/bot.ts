@@ -43,6 +43,12 @@ export const LashState = {
 };
 type Lash = typeof LashState.TBD | typeof LashState.CW | typeof LashState.CCW;
 
+type breselhamChar = 'L' | 'l' | 'R' | 'r' | 'B' | 'b';
+type stepper = () => void;
+type breselhamMap = {
+    [char in breselhamChar]: stepper;
+};
+
 export interface BotProps {
         wheelDiameter?: number;
         axleWidth?: number;
@@ -194,14 +200,14 @@ export class Bot {
         return stepMmAtWheel;
     }
 
-    bMap = ():object => {
+    bMap = ():breselhamMap => {
         return {
-            'L': this.stepLeft,
-            'l': this.stepBackLeft,
-            'R': this.stepRight,
-            'r': this.stepBackRight,
-            'B': this.stepBoth,
-            'b': this.stepBackBoth,
+            'L': this.stepLeft.bind(this),
+            'l': this.stepBackLeft.bind(this),
+            'R': this.stepRight.bind(this),
+            'r': this.stepBackRight.bind(this),
+            'B': this.stepBoth.bind(this),
+            'b': this.stepBackBoth.bind(this),
         };
     };
 
@@ -210,7 +216,7 @@ export class Bot {
             throw Error("bresenham string expected only to contain LlRrBb");
         }
         const bm = this.bMap();
-        for(var c of s.split('')){
+        for(const c of s.split('') as breselhamChar[]){
             bm[c]();
         }
         return []; // do to: make this return an array of the positions/orientations travelled through
