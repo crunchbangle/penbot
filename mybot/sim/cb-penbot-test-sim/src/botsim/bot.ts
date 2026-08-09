@@ -8,6 +8,29 @@ const stepsPerRevolution: number = gearboxRatio * stepsPerMotorRevolution;
 // those below are variable, either because I can manipulate them,
 // or because I need to measure them.
 
+export type Polar = {
+    r: number;
+    t: number;
+}
+export type Coords = {
+    x: number;
+    y: number;
+}
+
+const p2c = (p: Polar): Coords => {
+    return {
+        x: p.r * Math.cos(p.t),
+        y: p.r * Math.sin(p.t)
+    }
+}
+
+const c2p = (c: Coords): Polar => {
+    return {
+        r: Math.sqrt(c.x * c.x + c.y * c.y),
+        t: Math.atan2(c.y, c.x)
+    }
+}
+
 export const LashState = {
     TBD: "tbd",
     CW: "cw",
@@ -54,11 +77,16 @@ export class Bot {
     _positionY: number = 0.0;
     _orientation: number = 0.0; // radians, ccw from x-axis
 
-    _stepCounterLeft: number = 0;
-    _stepCounterRight: number = 0;
+    _stepCounter: number = 0;
 
     _lashLeft: Lash = LashState.TBD;
     _lashRight: Lash = LashState.TBD;
+
+    _wheelStepMm: number = 0.0; // mm per step at the wheel
+
+    _leftWheelPolarFromPen: Polar = {r: 0, t: 0};
+    _rightWheelPolarFromPen: Polar = {r: 0, t: 0};
+    _singleStepAngle: number = 0.0;
 
     constructor(props: BotProps|undefined = undefined){
         const {wheelDiameter, axleWidth, deadband, penDistanceFromAxle, penOffsetFromCenterline}
@@ -71,18 +99,88 @@ export class Bot {
         this._deadband = deadband!;
         this._penDistanceFromAxle = penDistanceFromAxle!;
         this._penOffsetFromCenterline = penOffsetFromCenterline!;
+
+        // bot starts with pen at origin, facing along positive x.
+        this._wheelStepMm = this.calculateStepMmAtWheel();
+
+        const wheelX = -this._penDistanceFromAxle;
+        const leftWheelY = this._axleWidth / 2 + this._penOffsetFromCenterline;
+        const rightWheelY = - this._axleWidth / 2 + this._penOffsetFromCenterline;
+
+        this._leftWheelPolarFromPen = c2p({x: wheelX, y: leftWheelY});
+        this._rightWheelPolarFromPen = c2p({x: wheelX, y: rightWheelY});
+
+        this._singleStepAngle = this._wheelStepMm / this._axleWidth;
     }
 
     revolutionsToSteps(revolutions: number): number {
         return revolutions * stepsPerRevolution;
     }
 
+    _rotateAroundLeftWheel = (angle: number) => this._rotateAroundWheel(angle, this._leftWheelPolarFromPen);
+
+    _rotateAroundRightWheel = (angle: number) => this._rotateAroundWheel(angle, this._rightWheelPolarFromPen);
+
+    _rotateAroundWheel = (angle: number, wheelPolarFromPen: Polar) => {
+        // we already know left wheel polar from pen
+        // to get its current position, rotate by orientation, get cart, translate to pen posn
+        const lwp:Polar = {... wheelPolarFromPen};
+        lwp.t += this._orientation;
+        const lwc = p2c(lwp);
+        lwc.x += this._positionX;
+        lwc.y += this._positionY;
+
+        // this is the position of the wheel. So translate the pen so the wheel as at zero!
+        const pen:Coords = {'x': this._positionX, 'y': this._positionY};
+        pen.x -= lwc.x;
+        pen.y -= lwc.y;
+        // rotate
+        const penp = c2p(pen);
+        penp.t += angle;
+        const penc = p2c(penp);
+        // untranslate
+        penc.x += lwc.x;
+        penc.y += lwc.y;
+        // set the position and new angle:
+        this._positionX = penc.x;
+        this._positionY = penc.y;
+        this._orientation += angle;
+    }
+
     stepLeft() {
-        this._stepCounterLeft++;
+        this._rotateAroundRightWheel(-this._singleStepAngle);
+        this._stepCounter++;
+    }
+
+    stepBackLeft() {
+        this._rotateAroundRightWheel(this._singleStepAngle);
+        this._stepCounter++;
     }
 
     stepRight() {
-        this._stepCounterRight++;
+        this._rotateAroundLeftWheel(this._singleStepAngle);
+        this._stepCounter++;
+    }
+
+    stepBackRight() {
+        this._rotateAroundLeftWheel(-this._singleStepAngle);
+        this._stepCounter++;
+    }
+
+    stepBoth() {
+        this._stepCounter++;
+        const x = this._wheelStepMm * Math.cos(this._orientation);
+        const y = this._wheelStepMm * Math.sin(this._orientation);
+        this._positionX += x;
+        this._positionY += y;
+    }
+
+    stepBackBoth() {
+        this._stepCounter++;
+        const x = -this._wheelStepMm * Math.cos(this._orientation);
+        const y = -this._wheelStepMm * Math.sin(this._orientation);
+        this._positionX += x;
+        this._positionY += y;
     }
 
     calculateStepMmAtWheel(): number {
