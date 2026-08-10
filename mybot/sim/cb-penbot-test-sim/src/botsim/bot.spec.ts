@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Bot } from './bot';
+import { Bot, LashState } from './bot';
 import type { Coords } from './bot';
 
 describe('28BYJ-48 geometry', () => {
@@ -317,5 +317,63 @@ describe('Bot Bresenham processing', ()=>{
         const bot = new Bot();
         const r = bot.bresenham(e['b']);
         expect(r).toHaveLength(e['l']);
+    })
+})
+
+
+describe('Bot lash/dead-band simulation', ()=>{
+    it('should be no lash with zero deadband', () =>{
+        const bot = new Bot({
+            "deadband": 0,
+            "startLashRight": LashState.Forward,
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the left wheel
+        bot.bresenham('RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR');
+        // should rotate back to original position
+        bot.bresenham('rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr');
+
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+    })
+    it('should be lash with non-zero deadband', () =>{
+        const bot = new Bot({
+            "deadband": 20,
+            "startLashRight": LashState.Forward,
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the left wheel
+        bot.bresenham('RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR');
+        // should NOT rotate back to original position
+        bot.bresenham('rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr');
+
+        expect(bot._positionX).not.toBeCloseTo(0);
+        expect(bot._positionY).not.toBeCloseTo(0);
+    })
+    it('should lash should require deadband extra steps to recover with non-zero deadband', () =>{
+        const bot = new Bot({
+            "deadband": 5,
+            "startLashRight": LashState.Forward,
+        });
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
+        // should rotate around the left wheel
+        bot.bresenham('RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR');
+        // should NOT rotate back to original position
+        bot.bresenham('rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr');
+
+        expect(bot._positionX).not.toBeCloseTo(0);
+        expect(bot._positionY).not.toBeCloseTo(0);
+
+        // should rotate back to original position
+        bot.bresenham('rrrrr');
+        expect(bot._positionX).toBeCloseTo(0);
+        expect(bot._positionY).toBeCloseTo(0);
+        
     })
 })

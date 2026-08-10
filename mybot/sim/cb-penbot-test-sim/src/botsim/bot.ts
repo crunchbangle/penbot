@@ -38,10 +38,16 @@ const c2p = (c: Coords): Polar => {
 
 export const LashState = {
     TBD: "tbd",
-    CW: "cw",
-    CCW: "ccw"
+    Forward: "forward",
+    Reverse: "reverse",
+    Between: "between",
 };
-type Lash = typeof LashState.TBD | typeof LashState.CW | typeof LashState.CCW;
+type Lash = typeof LashState.TBD | typeof LashState.Forward | typeof LashState.Reverse | typeof LashState.Between;
+
+type LashPosition = {
+    state: Lash;
+    position: number;
+}
 
 type breselhamChar = 'L' | 'l' | 'R' | 'r' | 'B' | 'b' | 'C' | 'c';
 type stepper = () => void;
@@ -57,16 +63,20 @@ export interface BotProps {
     penOffsetFromCenterline?: number;
     startX?: number;
     startY?: number;
+    startLashLeft?: Lash;
+    startLashRight?: Lash;
 }
 
 export const defaultBotProps: BotProps = {
     wheelDiameter: 36,
     axleWidth: 84,
-    deadband: 10,
+    deadband: 0,
     penDistanceFromAxle: 55,
     penOffsetFromCenterline: 0.0,
     startX: 0,
     startY: 0,
+    startLashLeft: LashState.TBD,
+    startLashRight: LashState.TBD,
 }
 
 export class Bot {
@@ -83,7 +93,7 @@ export class Bot {
     // all real-world measurements are in millimeters.
     _wheelDiameter: number = 36;
     _axleWidth: number = 84;
-    _deadband: number = 10; // whole-steps
+    _deadband: number = 0; // whole-steps
     // TODO: measure irl deadband in terms of steps
     _penDistanceFromAxle: number = 55;
     _penOffsetFromCenterline: number = 0.0;
@@ -94,8 +104,8 @@ export class Bot {
 
     _stepCounter: number = 0;
 
-    _lashLeft: Lash = LashState.TBD;
-    _lashRight: Lash = LashState.TBD;
+    _lashLeft: LashPosition = {state: LashState.TBD, position: 0};
+    _lashRight: LashPosition = {state: LashState.TBD, position: 0};
 
     _wheelStepMm: number = 0.0; // mm per step at the wheel
 
@@ -105,7 +115,9 @@ export class Bot {
     _singleStepAngle: number = 0.0;
 
     constructor(props: BotProps|undefined = undefined){
-        const {wheelDiameter, axleWidth, deadband, penDistanceFromAxle, penOffsetFromCenterline}
+        const {wheelDiameter, axleWidth, deadband, 
+            penDistanceFromAxle, penOffsetFromCenterline, 
+            startX, startY, startLashLeft, startLashRight: startLashRight}
          = props === undefined ? defaultBotProps : 
          {...defaultBotProps, ...props};
 
@@ -115,8 +127,12 @@ export class Bot {
         this._deadband = deadband!;
         this._penDistanceFromAxle = penDistanceFromAxle!;
         this._penOffsetFromCenterline = penOffsetFromCenterline!;
-        this._positionX = props?.startX!
-        this._positionY = props?.startY!
+        this._positionX = startX!
+        this._positionY = startY!
+        this._lashLeft = {state: startLashLeft!, 
+            position: startLashLeft === LashState.Forward ? deadband! : 0};
+        this._lashRight = {state: startLashRight!,
+            position: startLashRight === LashState.Forward ? deadband! : 0};
 
         // bot starts with pen at origin, facing along positive x.
         this._wheelStepMm = this.calculateStepMmAtWheel();
@@ -169,26 +185,41 @@ export class Bot {
     }
 
     stepLeft() {
-        this._rotateAroundRightWheel(-this._singleStepAngle);
+        if(! this.isLashForward(this._lashLeft)){
+            this._rotateAroundRightWheel(-this._singleStepAngle);
+        }
         this._stepCounter++;
     }
 
     stepBackLeft() {
-        this._rotateAroundRightWheel(this._singleStepAngle);
+        if(! this.isLashBackward(this._lashLeft)){
+            this._rotateAroundRightWheel(this._singleStepAngle);
+        }
         this._stepCounter++;
     }
 
     stepRight() {
-        this._rotateAroundLeftWheel(this._singleStepAngle);
+        if(! this.isLashForward(this._lashRight)){
+            this._rotateAroundLeftWheel(this._singleStepAngle);
+        }
         this._stepCounter++;
     }
 
     stepBackRight() {
-        this._rotateAroundLeftWheel(-this._singleStepAngle);
+        if(! this.isLashBackward(this._lashRight)){
+            this._rotateAroundLeftWheel(-this._singleStepAngle);
+        }
         this._stepCounter++;
     }
 
     stepBoth() {
+        // check lashes, redirect to stepRight/stepLeft
+        var isLashLeft = this.isLashForward(this._lashLeft);
+        var isLashRight = this.isLashForward(this._lashRight);
+        if(isLashLeft && isLashRight) return this._stepCounter++;
+        if(isLashLeft) return this.stepRight();
+        if(isLashRight) return this.stepLeft();
+        // okay, we handle it here
         this._stepCounter++;
         const x = this._wheelStepMm * Math.cos(this._orientation);
         const y = this._wheelStepMm * Math.sin(this._orientation);
@@ -197,6 +228,13 @@ export class Bot {
     }
 
     stepBackBoth() {
+        // check lashes, redirect to stepBackRight/stepBackLeft
+        var isLashLeft = this.isLashBackward(this._lashLeft);
+        var isLashRight = this.isLashBackward(this._lashRight);
+        if(isLashLeft && isLashRight) return this._stepCounter++;
+        if(isLashLeft) return this.stepBackRight();
+        if(isLashRight) return this.stepBackLeft();
+        // okay, we handle it here
         this._stepCounter++;
         const x = -this._wheelStepMm * Math.cos(this._orientation);
         const y = -this._wheelStepMm * Math.sin(this._orientation);
@@ -205,14 +243,112 @@ export class Bot {
     }
 
     stepCw(){
+        // check lashes, redirect to stepBackRight/stepLeft
+        var isLashLeft = this.isLashForward(this._lashLeft);
+        var isLashRight = this.isLashBackward(this._lashRight);
+        if(isLashLeft && isLashRight) return this._stepCounter++;
+        if(isLashLeft) return this.stepBackRight();
+        if(isLashRight) return this.stepLeft();
+        // okay, we handle it here
         this._stepCounter++;
         this._rotateAroundAxleMidpoint(-this._singleStepAngle*2);
     }
 
     stepCcw(){
+        // check lashes, redirect to stepRight/stepBackLeft
+        var isLashLeft = this.isLashBackward(this._lashLeft);
+        var isLashRight = this.isLashForward(this._lashRight);
+        if(isLashLeft && isLashRight) return this._stepCounter++;
+        if(isLashLeft) return this.stepRight();
+        if(isLashRight) return this.stepBackLeft();
+        // okay, we handle it here
         this._stepCounter++;
         this._rotateAroundAxleMidpoint(this._singleStepAngle*2);
     }
+
+    isLashForward(lash: LashPosition){
+        if(this._deadband === 0) return false; // no lash
+
+        // if we're already forward, just return false
+        if(lash.state === LashState.Forward){
+            return false;
+        }
+        
+        // if we're back, we transition to between
+        if(lash.state === LashState.Reverse){
+            lash.state = LashState.Between;
+            lash.position++;
+            return true;
+        }
+        // if we're between, need to check if we've got forward yet...
+        if(lash.state === LashState.Between){
+            lash.position++;
+            if(lash.position >= this._deadband){
+                lash.state = LashState.Forward;
+                lash.position = this._deadband;
+                // next time we'll move
+            }
+            // but this time it was just lash
+            return true;
+        }
+
+        // check if we're TBD - means started not knowing lash position!
+        // increment the lash
+        // if we make the threshold, set the state
+        if(lash.state === LashState.TBD){
+            lash.position++;
+            if(lash.position >= this._deadband){
+                lash.state = LashState.Forward;
+                lash.position = this._deadband;
+                // next time we'll move
+            }
+            // but this time it was just lash
+            return true;
+        }
+    }
+
+    isLashBackward(lash: LashPosition){
+        if(this._deadband === 0) return false; // no lash
+
+        // if we're already backward, just return false
+        if(lash.state === LashState.Reverse){
+            return false;
+        }
+        
+        // if we're forward, we transition to between
+        if(lash.state === LashState.Forward){
+            lash.state = LashState.Between;
+            lash.position--;
+            return true;
+        }
+        // if we're between, need to check if we've got backward yet...
+        if(lash.state === LashState.Between){
+            lash.position--;
+            if(lash.position <= 0){
+                lash.state = LashState.Reverse;
+                lash.position = 0;
+                // next time we'll move
+            }
+            // but this time it was just lash
+            return true;
+        }
+
+        // check if we're TBD - means started not knowing lash position!
+        // increment the lash
+        // if we make the threshold, set the state
+        if(lash.state === LashState.TBD){
+            lash.position--;
+            if(lash.position <= -this._deadband){
+                lash.state = LashState.Reverse;
+                lash.position = 0; // initial posn reverse is zero
+                // next time we'll move
+            }
+            // but this time it was just lash
+            return true;
+        }
+    }
+
+
 
     calculateStepMmAtWheel(): number {
         const wheelCircumference = Math.PI * this._wheelDiameter;
